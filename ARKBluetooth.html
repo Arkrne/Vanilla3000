@@ -158,6 +158,14 @@
                 </div>
 
                 <div class="section">
+                    <div class="section-title">⚡ Energy Rate Configuration</div>
+                    <div class="input-group">
+                        <input type="number" id="kwhRateInput" class="input-field" placeholder="kWh Rate (e.g., 14.50)" min="0" step="any">
+                        <button class="btn btn-primary" onclick="setKwhRate()" id="setKwhRateBtn">Set Rate</button>
+                    </div>
+                </div>
+                
+                <div class="section">
                     <div class="section-title">🎛️ Device Control</div>
                     <div class="control-group">
                         <button class="btn btn-success" onclick="sendCommand('ON')" id="onBtn">Turn ON</button>
@@ -263,17 +271,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
-        // --- IMPORTANT ---
-        // If you see a "permission_denied" error in the console, you MUST update your
-        // Firebase Realtime Database rules to allow public read/write.
-        // Go to your Firebase Project > Realtime Database > Rules and paste the following:
-        // {
-        //   "rules": {
-        //     ".read": true,
-        //     ".write": true
-        //   }
-        // }
-        // ---
         const firebaseConfig = {
             apiKey: "AIzaSyAkMrAaDqOoER0i5WJoDyqReiplqiBQYx4",
             authDomain: "vanilla3000-4f38d.firebaseapp.com",
@@ -449,7 +446,9 @@
             
             const isControlEnabled = (status === 'connected');
             document.querySelectorAll('.btn').forEach(btn => {
-                if (!btn.closest('#wifiSetupSection')) btn.disabled = !isControlEnabled;
+                if (!btn.closest('#wifiSetupSection') && !btn.closest('#firebaseSetupSection')) {
+                    btn.disabled = !isControlEnabled;
+                }
             });
         }
 
@@ -575,7 +574,15 @@
         function resetChartZoom() { if(chart) chart.resetZoom(); }
         
         // --- UI & HELPER FUNCTIONS ---
-        function setKwhRate() { sendCommand('RATE', document.getElementById('kwhRateInput').value); }
+        function setKwhRate() { 
+            const rate = document.getElementById('kwhRateInput').value;
+            if (parseFloat(rate) > 0) {
+                sendCommand('RATE', rate);
+                addLiveNotification(`Set kWh rate to ${rate}`, 'info');
+            } else {
+                addLiveNotification('Please enter a valid rate.', 'error');
+            }
+        }
         function setBudget() { sendCommand('SET_BUDGET', document.getElementById('budgetInput').value); }
         function deleteBudget() { sendCommand('SET_BUDGET', 0); }
         function setTimer() { 

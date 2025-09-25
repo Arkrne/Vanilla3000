@@ -561,8 +561,24 @@
             if (panel.children.length > 20) panel.removeChild(panel.lastChild);
         }
         function setButtonLoading(id, loading, text) { const btn = document.getElementById(id); btn.disabled = loading; btn.innerHTML = loading ? `<div class="spinner"></div> ${text}` : text; }
-        function initializeTheme() { if(isDarkMode) document.documentElement.setAttribute('data-theme', 'dark'); document.getElementById('themeToggle').textContent = isDarkMode ? '☀️' : '🌙'; }
-        function toggleDarkMode() { isDarkMode = !isDarkMode; localStorage.setItem('darkMode', isDarkMode); initializeTheme(); }
+        
+        // --- THEME FUNCTIONS (FIXED) ---
+        function initializeTheme() {
+            if (isDarkMode) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.getElementById('themeToggle').textContent = '☀️';
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                document.getElementById('themeToggle').textContent = '🌙';
+            }
+        }
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            localStorage.setItem('darkMode', isDarkMode);
+            initializeTheme();
+        }
+
         function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
     </script>
 </body>

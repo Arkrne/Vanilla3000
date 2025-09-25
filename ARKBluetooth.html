@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔌 Vanilla 3000 Smart Energy Monitor</title>
+    <title>🔌 Vanilla 3000 - Smart Energy Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.x/build/global/luxon.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -23,7 +25,6 @@
             --warning-color: #ed8936;
             --info-color: #4299e1;
         }
-
         [data-theme="dark"] {
             --primary-gradient: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
             --card-bg: rgba(45, 55, 72, 0.95);
@@ -32,7 +33,6 @@
             --border-color: #4a5568;
             --shadow-color: rgba(0, 0, 0, 0.3);
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
         body { background: var(--primary-gradient); min-height: 100vh; padding: 1rem; color: var(--text-primary); transition: all 0.3s ease; }
         .container { max-width: 1200px; margin: 0 auto; background: var(--card-bg); border-radius: 1.5rem; padding: 2rem; box-shadow: 0 20px 40px var(--shadow-color); backdrop-filter: blur(10px); min-height: calc(100vh - 2rem); display: flex; flex-direction: column; }
@@ -95,6 +95,8 @@
         .budget-time-display .value { font-size: 1.25rem; font-weight: 800; }
         .schedule-group { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: center; margin-bottom: 1rem;}
         .schedule-group label { font-weight: 600; color: var(--text-secondary); }
+        pre.code-block { background-color: #f3f4f6; border-radius: 0.5rem; padding: 1rem; font-family: monospace; color: #1f2937; white-space: pre-wrap; word-break: break-all; }
+        [data-theme="dark"] pre.code-block { background-color: #1f2937; color: #d1d5db; }
         @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } .header-controls { position: static; justify-content: center; margin-top: 1rem; } }
         @media (max-width: 640px) { body { padding: .25rem; } .container { padding: .75rem; } .header h1 { font-size: 1.8rem; } .header p { font-size: .85rem; } }
     </style>
@@ -112,23 +114,46 @@
 
         <div class="main-grid">
             <div class="left-column">
-                <div class="section" id="bleConfigSection">
-                    <div class="section-title">📡 Bluetooth (BLE) Control</div>
-                    <div id="bleStatus" class="connection-status disconnected">
-                        <div id="bleStatusDot" class="status-dot"></div>
-                        <span id="bleStatusText">BLE Disconnected</span>
-                    </div>
-                    <div class="control-group">
-                        <button class="btn btn-primary" onclick="manualConnect()" id="connectBLEBtn">Connect Manually</button>
-                        <button class="btn btn-danger" onclick="disconnectBLE()" id="disconnectBLEBtn" style="display: none;">Disconnect</button>
+                <div class="section" id="firebaseSetupSection" style="border-color: var(--error-color); border-width: 2px;">
+                    <div class="section-title">🚨 Important Firebase Setup</div>
+                    <p class="text-sm text-secondary mb-2">
+                        If the connection status is 'Offline' and you see a <strong>permission_denied</strong> error, you must update your Firebase security rules.
+                    </p>
+                    <p class="text-sm text-secondary mb-4">
+                        Go to your Firebase project's <strong>Realtime Database > Rules</strong> tab and replace the contents with the code below to allow this app to connect.
+                    </p>
+                    <pre class="code-block mb-4"><code>{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</code></pre>
+                    <a href="https://console.firebase.google.com/project/vanilla3000-4f38d/database/vanilla3000-4f38d-default-rtdb/rules" target="_blank" class="btn btn-danger w-full">Open Firebase Rules Editor</a>
+                </div>
+
+                 <div class="section">
+                    <div class="section-title">🌐 Connection</div>
+                     <div id="connectionStatus" class="connection-status disconnected">
+                        <div class="status-dot"></div>
+                        <span id="connectionStatusText">Offline</span>
                     </div>
                 </div>
 
-                <div class="section">
-                    <div class="section-title">⚡ Energy Rate Configuration</div>
+                <div class="section" id="wifiSetupSection">
+                    <div class="section-title">📶 WiFi & Bluetooth Setup</div>
+                    <p class="text-sm text-gray-500 mb-4">Connect via Bluetooth for initial WiFi setup or for local control if WiFi is unavailable.</p>
                     <div class="input-group">
-                        <input type="number" id="kwhRateInput" class="input-field" placeholder="kWh Rate (e.g., 13.3657)" min="0" step="any">
-                        <button class="btn btn-primary" onclick="setKwhRate()" id="setKwhRateBtn">Set Rate</button>
+                        <button class="btn btn-primary" onclick="connectBluetooth()" id="connectBLEBtn">Connect Bluetooth</button>
+                        <button class="btn btn-danger" onclick="disconnectBluetooth()" id="disconnectBLEBtn" style="display: none;">Disconnect</button>
+                    </div>
+                     <div class="input-group">
+                        <input type="text" id="wifiSsidInput" class="input-field" placeholder="WiFi Network Name (SSID)">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="wifiPassInput" class="input-field" placeholder="WiFi Password">
+                    </div>
+                    <div class="control-group">
+                         <button class="btn btn-success" onclick="provisionWifi()" id="provisionBtn" disabled>Send WiFi to Device</button>
                     </div>
                 </div>
 
@@ -139,8 +164,8 @@
                         <button class="btn btn-danger" onclick="sendCommand('OFF')" id="offBtn">Turn OFF</button>
                     </div>
                 </div>
-
-                <div class="section">
+                
+                 <div class="section">
                     <div class="section-title">📅 Schedule Control</div>
                     <div class="schedule-group">
                         <label for="scheduleOnTime">ON Time:</label>
@@ -189,7 +214,7 @@
                     </div>
                 </div>
 
-                <div class="section">
+                 <div class="section">
                     <div class="section-title">🔄 Reset Functions</div>
                     <div class="control-group">
                         <button class="btn btn-warning" onclick="sendCommand('RESET_KWH')" id="resetUsageBtn">Reset Usage</button>
@@ -197,6 +222,7 @@
                         <button class="btn btn-danger" onclick="confirmResetAll()" id="resetAllBtn">Reset All</button>
                     </div>
                 </div>
+
             </div>
 
             <div class="right-column">
@@ -208,6 +234,7 @@
                     <div class="metric-card"><div class="metric-label">Total Cost</div><div class="metric-value" id="cost">₱0.00</div><div class="metric-unit">PHP</div></div>
                 </div>
                 <div class="usage-tracker"><div class="usage-time" id="usageTime">00:00:00</div><div id="usageStatus">Active Session Runtime</div></div>
+                
                 <div class="section">
                     <div class="section-title">📊 Energy Usage Chart</div>
                     <div class="chart-container"><canvas id="usageChart"></canvas></div>
@@ -222,277 +249,263 @@
                         <button class="chart-btn btn-secondary" onclick="resetChartZoom()" id="resetZoomBtn">Reset View</button>
                     </div>
                 </div>
-                <div class="section"><div class="section-title">🔔 Live Notifications</div><div class="notifications-panel" id="notificationsList"></div></div>
+
+                <div class="section">
+                    <div class="section-title">🔔 Live Notifications</div>
+                    <div class="notifications-panel" id="notificationsList"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+
+        // --- IMPORTANT ---
+        // If you see a "permission_denied" error in the console, you MUST update your
+        // Firebase Realtime Database rules to allow public read/write.
+        // Go to your Firebase Project > Realtime Database > Rules and paste the following:
+        // {
+        //   "rules": {
+        //     ".read": true,
+        //     ".write": true
+        //   }
+        // }
+        // ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAkMrAaDqOoER0i5WJoDyqReiplqiBQYx4",
+            authDomain: "vanilla3000-4f38d.firebaseapp.com",
+            databaseURL: "https://vanilla3000-4f38d-default-rtdb.firebaseio.com",
+            projectId: "vanilla3000-4f38d",
+            storageBucket: "vanilla3000-4f38d.appspot.com",
+            messagingSenderId: "569470914348",
+            appId: "1:569470914348:web:1c1411c70fe59379dc2689"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // --- GLOBAL STATE ---
         let bleDevice = null, bleRxCharacteristic = null, chart = null;
-        let isDarkMode = localStorage.getItem('darkMode') === 'true';
+        let isFirebaseConnected = false;
+        let connectionMode = 'none'; // Can be 'firebase', 'bluetooth', or 'none'
+        let bleDataBuffer = '';
         let currentChartType = 'power';
-        let bleDataBuffer = ''; 
         const chartData = {
             power: JSON.parse(localStorage.getItem('chartData_power') || '[]'),
             cost: JSON.parse(localStorage.getItem('chartData_cost') || '[]'),
             kwh: JSON.parse(localStorage.getItem('chartData_kwh') || '[]'),
             labels: JSON.parse(localStorage.getItem('chartData_labels') || '[]')
         };
+        
+        // --- UI ELEMENTS ---
+        const connectionStatusEl = document.getElementById('connectionStatus');
+        const connectionStatusTextEl = document.getElementById('connectionStatusText');
+        const provisionBtn = document.getElementById('provisionBtn');
+        const connectBLEBtn = document.getElementById('connectBLEBtn');
+        const disconnectBLEBtn = document.getElementById('disconnectBLEBtn');
+        
+        // --- CORE FUNCTIONS ---
+        async function sendCommand(action, value = null) {
+            const command = (value !== null) ? `${action}:${value}` : `${action}`;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeTheme();
-            initializeNotifications();
-            initializeChart();
-            updateBLEConnectionStatus();
-            attemptAutoReconnect();
-            const savedRate = localStorage.getItem('kwhRate');
-            if (savedRate) document.getElementById('kwhRateInput').value = savedRate;
-        });
-
-        function initializeNotifications() { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
-        function showBrowserNotification(title, body) { if (Notification.permission === "granted") new Notification(title, { body: body, icon: 'https://img.icons8.com/fluency/96/lightning-bolt.png' });}
-
-        async function attemptAutoReconnect() {
-            if (!navigator.bluetooth?.getDevices) return;
-            try {
-                const permittedDevices = await navigator.bluetooth.getDevices();
-                if (permittedDevices.length > 0) {
-                    addLiveNotification('Found previous device, attempting to auto-connect...', 'info');
-                    await connectToDevice(permittedDevices[0]);
+            if (connectionMode === 'firebase') {
+                try {
+                    await set(ref(database, '/smart_plug/command'), command);
+                    console.log(`Firebase command sent: ${command}`);
+                } catch (error) {
+                    addLiveNotification(`Firebase command failed: ${error.message}`, 'error');
                 }
-            } catch(error) { addLiveNotification("Auto-reconnect failed.", "error"); }
+            } else if (connectionMode === 'bluetooth') {
+                if (!bleDevice?.gatt.connected || !bleRxCharacteristic) return addLiveNotification('Bluetooth not connected.', 'error');
+                try {
+                    await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(command + '\n'));
+                    console.log(`Bluetooth command sent: ${command}`);
+                } catch (error) {
+                    addLiveNotification(`Bluetooth command failed: ${error.message}`, 'error');
+                }
+            } else {
+                 addLiveNotification('Not connected. Cannot send command.', 'error');
+            }
         }
 
-        async function manualConnect() {
-            if (!navigator.bluetooth) return addLiveNotification('Web Bluetooth is not supported.', 'error');
+        function setupFirebaseListener() {
+            const deviceDataRef = ref(database, '/smart_plug/status_string');
+             onValue(deviceDataRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.length > 10) { // Check for valid data
+                    if (!isFirebaseConnected) {
+                       isFirebaseConnected = true;
+                       updateConnectionStatus('connected', 'firebase');
+                       addLiveNotification('Connected to device via Firebase.', 'success');
+                    }
+                    parseAndDisplayData(data);
+                } else {
+                    if(isFirebaseConnected) {
+                       isFirebaseConnected = false;
+                        if (connectionMode !== 'bluetooth') {
+                           updateConnectionStatus('disconnected');
+                        }
+                       addLiveNotification('Device offline from Firebase.', 'warning');
+                    }
+                }
+            }, (error) => {
+                console.error("Firebase listener error:", error);
+                isFirebaseConnected = false;
+                 if (connectionMode !== 'bluetooth') {
+                    updateConnectionStatus('disconnected');
+                }
+                addLiveNotification('Firebase permission denied. Please see the "Important Firebase Setup" section.', 'error');
+            });
+        }
+        
+        async function connectBluetooth() {
+            if (!navigator.bluetooth) return addLiveNotification('Web Bluetooth is not supported in this browser.', 'error');
             try {
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'HM-' }, { namePrefix: 'Vanilla' }, { namePrefix: 'Energy' }],
-                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0000ffe0-0000-1000-8000-00805f9b34fb']
+                    filters: [{ name: 'ESP32_Power_Monitor' }],
+                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
                 });
-                await connectToDevice(device);
-            } catch(error) { if (error.name !== 'NotFoundError') addLiveNotification(`Connection failed: ${error.message}`, 'error'); }
-        }
-
-        async function connectToDevice(device) {
-            if (!device) return;
-            setButtonLoading('connectBLEBtn', true, 'Connecting...');
-            updateBLEConnectionStatus('connecting');
-            try {
-                bleDevice = device;
-                bleDevice.addEventListener('gattserverdisconnected', onBLEDisconnected);
-                const server = await bleDevice.gatt.connect();
-                const servicesToTry = ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0000ffe0-0000-1000-8000-00805f9b34fb'];
-                let service;
-                for (const serviceUUID of servicesToTry) {
-                    service = await server.getPrimaryService(serviceUUID).catch(() => null);
-                    if (service) break;
-                }
-                if (!service) throw new Error("Compatible UART service not found.");
-                const isHM10 = service.uuid.includes('ffe0');
-                const rxUUID = isHM10 ? '0000ffe1-0000-1000-8000-00805f9b34fb' : '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-                const txUUID = isHM10 ? '0000ffe1-0000-1000-8000-00805f9b34fb' : '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
-                bleRxCharacteristic = await service.getCharacteristic(rxUUID);
-                const notifyCharacteristic = await service.getCharacteristic(txUUID);
+                
+                updateConnectionStatus('connecting', 'bluetooth');
+                device.addEventListener('gattserverdisconnected', onBLEDisconnected);
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+                bleRxCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+                const notifyCharacteristic = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
                 await notifyCharacteristic.startNotifications();
                 notifyCharacteristic.addEventListener('characteristicvaluechanged', onBLECharacteristicValueChanged);
-                updateBLEConnectionStatus('connected');
-                addLiveNotification(`✅ Connected to ${bleDevice.name || 'device'}`, 'success');
+                
+                bleDevice = device;
+                updateConnectionStatus('connected', 'bluetooth');
+                addLiveNotification(`Connected via Bluetooth to ${bleDevice.name}.`, 'success');
+                
             } catch(error) {
-                console.error("Connection failed:", error);
-                addLiveNotification(`Connection to ${device.name || 'device'} failed: ${error.message}`, 'error'); 
-                onBLEDisconnected();
-            } finally {
-                setButtonLoading('connectBLEBtn', false, 'Connect Manually');
+                if (error.name !== 'NotFoundError') {
+                    addLiveNotification(`Bluetooth connection failed: ${error.message}`, 'error');
+                }
+                if (!isFirebaseConnected) updateConnectionStatus('disconnected');
             }
         }
 
         function onBLEDisconnected() {
-            if(bleDevice) bleDevice.removeEventListener('gattserverdisconnected', onBLEDisconnected);
+            addLiveNotification('Bluetooth disconnected.', 'warning');
+            if (bleDevice) bleDevice.removeEventListener('gattserverdisconnected', onBLEDisconnected);
             bleDevice = null;
-            updateBLEConnectionStatus('disconnected');
-            addLiveNotification('🔴 BLE device disconnected', 'warning');
+            bleRxCharacteristic = null;
+             if (isFirebaseConnected) {
+                updateConnectionStatus('connected', 'firebase');
+            } else {
+                updateConnectionStatus('disconnected');
+            }
         }
-
-        async function disconnectBLE() {
-            if (bleDevice?.gatt.connected) await bleDevice.gatt.disconnect();
-            else onBLEDisconnected();
+        
+        async function disconnectBluetooth() {
+            if (bleDevice?.gatt.connected) {
+                await bleDevice.gatt.disconnect();
+            }
         }
-
-        function updateBLEConnectionStatus(status = null) {
-            const isConnected = bleDevice?.gatt.connected;
-            status = status || (isConnected ? 'connected' : 'disconnected');
-            document.getElementById('bleStatusText').textContent = { connected: `Connected to ${bleDevice?.name || 'device'}`, connecting: 'Connecting...', disconnected: 'Disconnected' }[status];
-            document.getElementById('bleStatus').className = `connection-status ${status}`;
-            document.getElementById('disconnectBLEBtn').style.display = isConnected ? 'inline-flex' : 'none';
-            const controlButtons = ['onBtn', 'offBtn', 'budgetBtn', 'deleteBudgetBtn', 'timerBtn', 'deleteTimerBtn', 'setKwhRateBtn', 'resetUsageBtn', 'resetTimeBtn', 'resetAllBtn', 'scheduleBtn', 'deleteScheduleBtn'];
-            controlButtons.forEach(id => { const btn = document.getElementById(id); if(btn) btn.disabled = !isConnected; });
-        }
-
+        
         function onBLECharacteristicValueChanged(event) {
             const receivedChunk = new TextDecoder().decode(event.target.value);
-            bleDataBuffer += receivedChunk; 
-            
+            bleDataBuffer += receivedChunk;
             let newlineIndex;
             while ((newlineIndex = bleDataBuffer.indexOf('\n')) !== -1) {
-                const completeLine = bleDataBuffer.substring(0, newlineIndex).trim(); 
-                bleDataBuffer = bleDataBuffer.substring(newlineIndex + 1); 
-
-                if (completeLine) { 
-                    console.log("Processed complete BLE line:", completeLine); 
-                    if (completeLine.startsWith('ALERT:')) {
-                        handleAlert(completeLine);
-                    } else if (completeLine.includes('V:') && completeLine.includes('I:')) {
-                        parseSensorData(completeLine);
-                    }
+                const completeLine = bleDataBuffer.substring(0, newlineIndex).trim();
+                bleDataBuffer = bleDataBuffer.substring(newlineIndex + 1);
+                if (completeLine) {
+                    if (completeLine.startsWith('ALERT:')) handleAlert(completeLine);
+                    else if (completeLine.includes('V:') && completeLine.includes('I:')) parseAndDisplayData(completeLine);
                 }
             }
         }
 
-        function handleAlert(alertData) {
-            const alertMessage = alertData.substring(alertData.indexOf('|') + 1) || 'An alert was triggered.';
-            addLiveNotification(`🚨 ${alertMessage}`, 'warning');
-            showBrowserNotification('Vanilla 3000 Alert', alertMessage);
+        async function provisionWifi() {
+            const ssid = document.getElementById('wifiSsidInput').value;
+            const pass = document.getElementById('wifiPassInput').value;
+            if (!ssid) return addLiveNotification("Please enter a WiFi Network Name (SSID).", 'error');
+            const command = `PROVISION:${ssid},${pass}`;
+            await sendCommand(command); // This will send via BT if connected
+            addLiveNotification("WiFi credentials sent. The device will reboot and attempt to connect.", 'info');
+            setTimeout(() => { if (bleDevice?.gatt.connected) bleDevice.gatt.disconnect(); }, 1000);
         }
 
-        function parseSensorData(data) {
-            const metrics = {};
-            data.split(',').forEach(part => {
-                const i = part.indexOf(':');
-                if (i > -1) {
-                    const key = part.substring(0, i).trim();
-                    const value = part.substring(i + 1).trim();
-                    metrics[key] = value;
-                }
+        function updateConnectionStatus(status, type = 'none') {
+            connectionMode = (status === 'connected') ? type : 'none';
+            
+            connectBLEBtn.style.display = (status === 'connected' && type === 'bluetooth') ? 'none' : 'flex';
+            disconnectBLEBtn.style.display = (status === 'connected' && type === 'bluetooth') ? 'flex' : 'none';
+            provisionBtn.disabled = !(status === 'connected' && type === 'bluetooth');
+
+            connectionStatusEl.className = `connection-status ${status}`;
+            const statusTextMap = {
+                connected: `${type.charAt(0).toUpperCase() + type.slice(1)} Connected`,
+                connecting: `Connecting to ${type}...`,
+                disconnected: 'Offline'
+            };
+            connectionStatusTextEl.textContent = statusTextMap[status] || 'Offline';
+            
+            const isControlEnabled = (status === 'connected');
+            document.querySelectorAll('.btn').forEach(btn => {
+                if (!btn.closest('#wifiSetupSection')) btn.disabled = !isControlEnabled;
             });
-            updateMetricsUI(metrics);
-            const power = parseFloat(metrics.P);
-            const cost = parseFloat(metrics.COST);
-            const kwh = parseFloat(metrics.KWH);
-            if (!isNaN(power) && !isNaN(cost) && !isNaN(kwh)) {
-                addDataPoint(power, cost, kwh);
-            } else {
-                console.error("Invalid numeric data for chart received:", metrics);
-            }
         }
 
-        function updateMetricsUI(data) {
-            if (data.V !== undefined) document.getElementById('voltage').textContent = parseFloat(data.V).toFixed(1);
-            if (data.I !== undefined) document.getElementById('current').textContent = parseFloat(data.I).toFixed(2);
-            if (data.P !== undefined) document.getElementById('power').textContent = parseFloat(data.P).toFixed(1);
-            if (data.KWH !== undefined) document.getElementById('energy').textContent = parseFloat(data.KWH).toFixed(3);
-            if (data.COST !== undefined) document.getElementById('cost').textContent = `₱${parseFloat(data.COST).toFixed(2)}`;
-            if (data.Relay !== undefined) document.getElementById('usageStatus').textContent = `Device: ${data.Relay}`;
-            if (data.RUNTIME !== undefined) {
-                const s = parseInt(data.RUNTIME, 10);
-                if (!isNaN(s)) {
-                    document.getElementById('usageTime').textContent = `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor(s%3600/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-                }
-            }
+        function parseAndDisplayData(dataString) {
+            const metrics = {};
+            dataString.split(',').forEach(part => {
+                const i = part.indexOf(':');
+                if (i > -1) metrics[part.substring(0, i).trim()] = part.substring(i + 1).trim();
+            });
+
+            document.getElementById('voltage').textContent = parseFloat(metrics.V || 0).toFixed(1);
+            document.getElementById('current').textContent = parseFloat(metrics.I || 0).toFixed(2);
+            document.getElementById('power').textContent = parseFloat(metrics.P || 0).toFixed(1);
+            document.getElementById('energy').textContent = parseFloat(metrics.KWH || 0).toFixed(3);
+            document.getElementById('cost').textContent = `₱${parseFloat(metrics.COST || 0).toFixed(2)}`;
+            document.getElementById('usageStatus').textContent = `Device: ${metrics.Relay || 'N/A'}`;
+            const s = parseInt(metrics.RUNTIME || '0', 10);
+            document.getElementById('usageTime').textContent = `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor(s%3600/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+        
             const timerDisplay = document.getElementById('remainingTimerDisplay');
-            if (data.REM_TIME && parseInt(data.REM_TIME, 10) > 0) {
-                const s = parseInt(data.REM_TIME, 10);
+            if (metrics.REM_TIME && parseInt(metrics.REM_TIME, 10) > 0) {
+                const s = parseInt(metrics.REM_TIME, 10);
                 document.getElementById('remainingTimer').textContent = `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor(s%3600/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
                 timerDisplay.style.display = 'flex';
             } else { timerDisplay.style.display = 'none'; }
+            
             const budgetDisplay = document.getElementById('remainingBudgetDisplay');
-            if (data.REM_BUDGET && parseFloat(data.REM_BUDGET) > 0) {
-                document.getElementById('remainingBudget').textContent = `₱${parseFloat(data.REM_BUDGET).toFixed(2)}`;
+            if (metrics.REM_BUDGET && parseFloat(metrics.REM_BUDGET) > 0) {
+                document.getElementById('remainingBudget').textContent = `₱${parseFloat(metrics.REM_BUDGET).toFixed(2)}`;
                 budgetDisplay.style.display = 'flex';
             } else { budgetDisplay.style.display = 'none'; }
             
             const scheduleDisplay = document.getElementById('activeScheduleDisplay');
-            if (data.SCHED_ACTIVE && parseInt(data.SCHED_ACTIVE) === 1) {
-                const onTimeParts = data.SCHED_ON.split(':');
-                const offTimeParts = data.SCHED_OFF.split(':');
-                const onHour12 = parseInt(onTimeParts[0]) % 12 || 12;
-                const onAmPm = parseInt(onTimeParts[0]) >= 12 ? 'PM' : 'AM';
-                const offHour12 = parseInt(offTimeParts[0]) % 12 || 12;
-                const offAmPm = parseInt(offTimeParts[0]) >= 12 ? 'PM' : 'AM';
-                document.getElementById('activeSchedule').textContent = `ON: ${onHour12}:${onTimeParts[1]} ${onAmPm} | OFF: ${offHour12}:${offTimeParts[1]} ${offAmPm}`;
+            if (metrics.SCHED_ACTIVE && parseInt(metrics.SCHED_ACTIVE) === 1) {
+                const [onH, onM] = metrics.SCHED_ON.split(':');
+                const [offH, offM] = metrics.SCHED_OFF.split(':');
+                const format12Hour = (h, m) => `${(parseInt(h)%12 || 12)}:${m.padStart(2,'0')} ${parseInt(h)>=12 ? 'PM' : 'AM'}`;
+                document.getElementById('activeSchedule').textContent = `ON: ${format12Hour(onH,onM)} | OFF: ${format12Hour(offH,offM)}`;
                 scheduleDisplay.style.display = 'flex';
-            } else {
-                scheduleDisplay.style.display = 'none';
-            }
-        }
-
-        async function sendCommand(action, value = null) {
-            if (!bleDevice?.gatt.connected || !bleRxCharacteristic) return addLiveNotification('Not connected.', 'error');
-            try {
-                const command = (value !== null) ? `${action}:${value}\n` : `${action}\n`;
-                await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(command));
-            } catch (error) { addLiveNotification(`Command failed: ${error.message}`, 'error'); }
-        }
-
-        function setKwhRate() {
-            const rateString = document.getElementById('kwhRateInput').value;
-            if (/^[0-9]*\.?[0-9]+$/.test(rateString) && parseFloat(rateString) > 0) {
-                sendCommand('RATE', rateString);
-                localStorage.setItem('kwhRate', rateString);
-                addLiveNotification(`kWh rate set to ₱${rateString}`, 'success');
-            } else { addLiveNotification('Invalid rate. Must be a number > 0.', 'error'); }
-        }
-        function setBudget() { 
-            const budgetInput = document.getElementById('budgetInput');
-            const b = parseFloat(budgetInput.value); 
-            if (!isNaN(b) && b > 0) { 
-                sendCommand('SET_BUDGET', b);  
-                budgetInput.value = ''; 
-            } else { 
-                addLiveNotification('Please enter a budget > 0.', 'error'); 
-            } 
-        }
-        function deleteBudget() { sendCommand('SET_BUDGET', 0); addLiveNotification('Active budget deleted.', 'info'); }
-        
-        function setTimer() {
-            const hInput = document.getElementById('timerHoursInput');
-            const mInput = document.getElementById('timerMinutesInput');
-            const h = parseInt(hInput.value || '0', 10);
-            const m = parseInt(mInput.value || '0', 10);
-            const totalMinutes = (h * 60) + m;
-            if (totalMinutes > 0) {
-                sendCommand('SET_TIMER', totalMinutes);
-                addLiveNotification(`Timer set for ${h}h ${m}m.`, 'success');
-                hInput.value = '';
-                mInput.value = '';
-            } else {
-                addLiveNotification('Please enter a duration greater than 0.', 'error');
-            }
-        }
-        function deleteTimer() { sendCommand('SET_TIMER', 0); addLiveNotification('Active timer deleted.', 'info'); }
-        
-        function setSchedule() {
-            const onTimeInput = document.getElementById('scheduleOnTime');
-            const offTimeInput = document.getElementById('scheduleOffTime');
-            const onTimeValue = onTimeInput.value;
-            const offTimeValue = offTimeInput.value;
-
-            if (!onTimeValue || !offTimeValue) {
-                 return addLiveNotification('Please select both an ON and OFF time.', 'error');
-            }
-
-            const [onHour, onMin] = onTimeValue.split(':').map(Number);
-            const [offHour, offMin] = offTimeValue.split(':').map(Number);
+            } else { scheduleDisplay.style.display = 'none'; }
             
-            const scheduleString = `${onHour},${onMin},${offHour},${offMin}`;
-            sendCommand('SCHED', scheduleString);
-            addLiveNotification('Schedule sent to device.', 'success');
-            onTimeInput.value = '';
-            offTimeInput.value = '';
-        }
-
-        function deleteSchedule() {
-            sendCommand('DEL_SCHED');
-            addLiveNotification('Schedule deleted.', 'info');
+             addDataPoint(parseFloat(metrics.P || 0), parseFloat(metrics.COST || 0), parseFloat(metrics.KWH || 0));
         }
         
-        function confirmResetAll() { if(confirm("Are you sure? This will clear all usage data and settings on the device.")) sendCommand('RESET_ALL'); }
+        function handleAlert(alertData) {
+            const message = alertData.split('|')[1] || 'Device alert!';
+            addLiveNotification(`🚨 ${message}`, 'warning');
+            if (Notification.permission === "granted") new Notification('Vanilla 3000 Alert', { body: message });
+        }
 
+        // --- CHART FUNCTIONS ---
         function initializeChart() {
             const ctx = document.getElementById('usageChart').getContext('2d');
             chart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] },
                 options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'hour' } }, y: { beginAtZero: true, title: { display: true } } },
-                    plugins: { legend: { display: false }, zoom: { pan: { enabled: true, mode: 'x', threshold: 5 }, zoom: { wheel: { enabled: true, onZoomComplete: ({chart}) => {chart.update('none')} }, pinch: { enabled: true }, mode: 'x' } } }
+                    plugins: { legend: { display: false }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }
                 }
             });
             toggleChartType(currentChartType);
@@ -500,21 +513,48 @@
         }
 
         function addDataPoint(power, cost, kwh) {
-            const now = new Date(), nowISO = now.toISOString();
-            chartData.labels.push(nowISO); chartData.power.push(power); chartData.cost.push(cost); chartData.kwh.push(kwh);
-            while (chartData.labels.length > 1440) { Object.keys(chartData).forEach(key => chartData[key].shift()); }
+            const nowISO = new Date().toISOString();
+            chartData.labels.push(nowISO); 
+            chartData.power.push(power); 
+            chartData.cost.push(cost); 
+            chartData.kwh.push(kwh);
+            
+            const maxPoints = 2880; // Keep 48 hours of 1-minute data
+            while (chartData.labels.length > maxPoints) { 
+                Object.keys(chartData).forEach(key => chartData[key].shift()); 
+            }
             Object.keys(chartData).forEach(key => localStorage.setItem(`chartData_${key}`, JSON.stringify(chartData[key])));
+            
             if (chart?.data.datasets.length > 0) {
-                chart.data.labels.push(now);
-                chart.data.datasets[0].data.push(chartData[currentChartType].slice(-1)[0]);
-                while(chart.data.labels.length > 1440) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+                chart.data.labels.push(new Date(nowISO));
+                chart.data.datasets[0].data.push({power, cost, kwh}[currentChartType]);
+                while(chart.data.labels.length > maxPoints) { 
+                    chart.data.labels.shift(); 
+                    chart.data.datasets[0].data.shift(); 
+                }
                 if(!chart.isZoomedOrPanned()) chart.update('none');
             }
         }
 
+        function updateChart() {
+            if (!chart) return;
+            const labelMap = { power: 'Power (W)', kwh: 'Energy (kWh)', cost: 'Cost (PHP)' };
+            const colorMap = { power: '#667eea', kwh: '#38a169', cost: '#ed8936' };
+            
+            const dataPoints = chartData[currentChartType] || [];
+            
+            chart.data.labels = chartData.labels.map(l => new Date(l));
+            chart.data.datasets = [{
+                data: dataPoints, label: labelMap[currentChartType], borderColor: colorMap[currentChartType],
+                backgroundColor: colorMap[currentChartType] + '1A', tension: 0.1, fill: true, pointRadius: 0, borderWidth: 1.5
+            }];
+            chart.options.scales.y.title.text = labelMap[currentChartType];
+            chart.update('none');
+        }
+
         function toggleChartType(type) {
             currentChartType = type;
-            document.querySelectorAll('#chartTypePower, #chartTypeKwh, #chartTypeCost').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.chart-controls .chart-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`chartType${type.charAt(0).toUpperCase() + type.slice(1)}`)?.classList.add('active');
             updateChart();
         }
@@ -522,36 +562,38 @@
         function setChartTimeRange(period) {
             if (!chart) return;
             const now = new Date();
-            let minTime;
-            const timeRanges = {
-                '1H': 60 * 60 * 1000,
-                '24H': 24 * 60 * 60 * 1000,
-                '7D': 7 * 24 * 60 * 60 * 1000
-            };
-            minTime = (period === 'All') ? null : new Date(now.getTime() - timeRanges[period]);
-
+            let minTime = null;
+            if (period === '1H') minTime = new Date(now.getTime() - 60 * 60 * 1000);
+            else if (period === '24H') minTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            else if (period === '7D') minTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
             chart.options.scales.x.min = minTime;
             chart.options.scales.x.max = now;
             chart.update('normal');
-
-            document.querySelectorAll('.chart-controls #timeRange1H, #timeRange24H, #timeRange7D, #timeRangeAll').forEach(b => b.classList.remove('active'));
-            document.getElementById(`timeRange${period}`).classList.add('active');
         }
 
-        function updateChart() {
-            if (!chart) return;
-            const labelMap = { power: 'Power (W)', kwh: 'Energy (kWh)', cost: 'Cost (PHP)' };
-            const colorMap = { power: '#667eea', kwh: '#38a169', cost: '#ed8936' };
-            chart.data.labels = chartData.labels.map(l => new Date(l));
-            chart.data.datasets = [{
-                data: chartData[currentChartType], label: labelMap[currentChartType], borderColor: colorMap[currentChartType],
-                backgroundColor: colorMap[currentChartType] + '1A', tension: 0.1, fill: true, pointRadius: 0, borderWidth: 1.5
-            }];
-            chart.options.scales.y.title.text = labelMap[currentChartType];
-            chart.update('none');
+        function resetChartZoom() { if(chart) chart.resetZoom(); }
+        
+        // --- UI & HELPER FUNCTIONS ---
+        function setKwhRate() { sendCommand('RATE', document.getElementById('kwhRateInput').value); }
+        function setBudget() { sendCommand('SET_BUDGET', document.getElementById('budgetInput').value); }
+        function deleteBudget() { sendCommand('SET_BUDGET', 0); }
+        function setTimer() { 
+            const h = parseInt(document.getElementById('timerHoursInput').value || '0');
+            const m = parseInt(document.getElementById('timerMinutesInput').value || '0');
+            sendCommand('SET_TIMER', (h * 60) + m);
         }
-
-        function resetChartZoom() { if(chart) { chart.resetZoom(); setChartTimeRange('All'); } }
+        function deleteTimer() { sendCommand('SET_TIMER', 0); }
+        function setSchedule() {
+            const on = document.getElementById('scheduleOnTime').value;
+            const off = document.getElementById('scheduleOffTime').value;
+            if (!on || !off) return addLiveNotification('Please select both ON and OFF times.', 'error');
+            const [onH, onM] = on.split(':');
+            const [offH, offM] = off.split(':');
+            sendCommand('SCHED', `${onH},${onM},${offH},${offM}`);
+        }
+        function deleteSchedule() { sendCommand('DEL_SCHED'); }
+        function confirmResetAll() { if(confirm("This will factory reset the device, deleting all settings including WiFi. You will need to provision it again. Are you sure?")) sendCommand('RESET_ALL'); }
 
         function addLiveNotification(message, type) {
             const panel = document.getElementById('notificationsList'), item = document.createElement('div');
@@ -560,10 +602,41 @@
             panel.insertBefore(item, panel.firstChild);
             if (panel.children.length > 20) panel.removeChild(panel.lastChild);
         }
-        function setButtonLoading(id, loading, text) { const btn = document.getElementById(id); btn.disabled = loading; btn.innerHTML = loading ? `<div class="spinner"></div> ${text}` : text; }
-        function initializeTheme() { if(isDarkMode) document.documentElement.setAttribute('data-theme', 'dark'); document.getElementById('themeToggle').textContent = isDarkMode ? '☀️' : '🌙'; }
-        function toggleDarkMode() { isDarkMode = !isDarkMode; localStorage.setItem('darkMode', isDarkMode); initializeTheme(); }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.toggleAttribute('data-theme');
+            localStorage.setItem('darkMode', isDark);
+            document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+        }
         function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+
+        // --- GLOBAL ACCESS & INITIALIZATION ---
+        window.connectBluetooth = connectBluetooth;
+        window.disconnectBluetooth = disconnectBluetooth;
+        window.provisionWifi = provisionWifi;
+        window.sendCommand = sendCommand;
+        window.setKwhRate = setKwhRate;
+        window.setBudget = setBudget;
+        window.deleteBudget = deleteBudget;
+        window.setTimer = setTimer;
+        window.deleteTimer = deleteTimer;
+        window.setSchedule = setSchedule;
+        window.deleteSchedule = deleteSchedule;
+        window.confirmResetAll = confirmResetAll;
+        window.toggleDarkMode = toggleDarkMode;
+        window.toggleFullscreen = toggleFullscreen;
+        window.toggleChartType = toggleChartType;
+        window.setChartTimeRange = setChartTimeRange;
+        window.resetChartZoom = resetChartZoom;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('darkMode') === 'true') document.documentElement.setAttribute('data-theme', 'dark');
+            initializeChart();
+            updateConnectionStatus('disconnected');
+            setupFirebaseListener();
+            if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+        });
     </script>
 </body>
 </html>
+

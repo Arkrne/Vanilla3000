@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔌 Vanilla 3000 Smart Energy Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/paho-mqtt@1.1.0/paho-mqtt.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.x/build/global/luxon.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -111,16 +114,28 @@
 
         <div class="main-grid">
             <div class="left-column">
-                <div class="section" id="btConfigSection">
-                    <div class="section-title">📡 Bluetooth Control</div>
-                    <div id="btStatus" class="connection-status disconnected">
-                        <div id="btStatusDot" class="status-dot"></div>
-                        <span id="btStatusText">Disconnected</span>
+                <div class="section">
+                    <div class="section-title">📡 Connection</div>
+                    <div id="connectionStatus" class="connection-status disconnected">
+                        <div class="status-dot"></div>
+                        <span id="connectionStatusText">Offline</span>
                     </div>
                     <div class="control-group">
-                        <button class="btn btn-primary" onclick="manualConnect()" id="connectBtn">Connect to Device</button>
-                        <button class="btn btn-danger" onclick="disconnect()" id="disconnectBtn" style="display: none;">Disconnect</button>
+                        <button class="btn btn-primary" onclick="connectDevice()" id="connectBtn">Connect to Device</button>
+                        <button class="btn btn-danger" onclick="disconnectDevice()" id="disconnectBtn" style="display: none;">Disconnect</button>
                     </div>
+                </div>
+
+                <div class="section" id="wifiSetupSection" style="display: none;">
+                    <div class="section-title">🌐 Wi-Fi Provisioning</div>
+                     <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
+                    <div class="input-group">
+                        <input type="text" id="wifiSsidInput" class="input-field" placeholder="Wi-Fi Name (SSID)">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="wifiPassInput" class="input-field" placeholder="Wi-Fi Password">
+                    </div>
+                    <button class="btn btn-primary w-full" onclick="sendWifiCredentials()">Save & Reboot Device</button>
                 </div>
 
                 <div class="section">
@@ -206,7 +221,7 @@
                     <div class="metric-card"><div class="metric-label">Total kWh</div><div class="metric-value" id="energy">0.000</div><div class="metric-unit">kWh</div></div>
                     <div class="metric-card"><div class="metric-label">Total Cost</div><div class="metric-value" id="cost">₱0.00</div><div class="metric-unit">PHP</div></div>
                 </div>
-                <div class="usage-tracker"><div class="usage-time" id="usageTime">00:00:00</div><div id="usageStatus">Active Session Runtime</div></div>
+                <div class="usage-tracker"><div class="usage-time" id="usageTime">00:00:00</div><div id="usageStatus">Device Status</div></div>
                 <div class="section">
                     <div class="section-title">📊 Energy Usage Chart</div>
                     <div class="chart-container"><canvas id="usageChart"></canvas></div>
@@ -227,169 +242,217 @@
     </div>
 
     <script>
-        let btDevice = null, btTxCharacteristic = null, btRxCharacteristic = null, chart = null;
+        // --- CONFIGURATION ---
+        const MQTT_BROKER   = "a656476c0c1f45d88ec84cf10f7dd1b4.s1.eu.hivemq.cloud";
+        const MQTT_PORT     = 8883;
+        const MQTT_USERNAME = "Arkrne.";
+        const MQTT_PASSWORD = "Arkrne123!@#";
+        const STATUS_TOPIC   = "smartplug/status";
+        const COMMAND_TOPIC  = "smartplug/command";
+        const LWT_TOPIC      = "smartplug/connection";
+        const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+        const BLE_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+        const BLE_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+        // --- STATE VARIABLES ---
+        let mqttClient = null;
+        let bleDevice = null;
+        let bleRxCharacteristic = null;
+        let connectionMode = 'none'; // 'none', 'ble', 'mqtt'
         let isDarkMode = localStorage.getItem('darkMode') === 'true';
+        let chart = null;
         let currentChartType = 'power';
-        let btDataBuffer = ''; 
         const chartData = {
-            power: JSON.parse(localStorage.getItem('chartData_power') || '[]'),
-            cost: JSON.parse(localStorage.getItem('chartData_cost') || '[]'),
-            kwh: JSON.parse(localStorage.getItem('chartData_kwh') || '[]'),
-            labels: JSON.parse(localStorage.getItem('chartData_labels') || '[]')
+            power: [],
+            cost: [],
+            kwh: [],
+            labels: []
         };
-
-        const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-        const UART_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // TX from ESP32's perspective (Notify)
-        const UART_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // RX to ESP32's perspective (Write)
-
+        
+        // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             initializeTheme();
-            initializeNotifications();
             initializeChart();
-            updateConnectionStatus();
-            attemptAutoReconnect();
+            updateConnectionStatus('disconnected'); // Set initial button states
             const savedRate = localStorage.getItem('kwhRate');
             if (savedRate) document.getElementById('kwhRateInput').value = savedRate;
         });
 
-        function initializeNotifications() { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
-        function showBrowserNotification(title, body) { if (Notification.permission === "granted") new Notification(title, { body: body, icon: 'https://img.icons8.com/fluency/96/lightning-bolt.png' });}
-
-        async function attemptAutoReconnect() {
-            if (!navigator.bluetooth?.getDevices) return;
-            try {
-                const permittedDevices = await navigator.bluetooth.getDevices();
-                if (permittedDevices.length > 0) {
-                    addLiveNotification('Found previous device, attempting to auto-connect...', 'info');
-                    await connectToDevice(permittedDevices[0]);
-                }
-            } catch(error) { addLiveNotification("Auto-reconnect failed.", "error"); }
-        }
-
-        async function manualConnect() {
-            if (!navigator.bluetooth) return addLiveNotification('Web Bluetooth is not supported on this browser.', 'error');
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'ESP32_Power_Monitor' }],
-                    optionalServices: [UART_SERVICE_UUID]
-                });
-                await connectToDevice(device);
-            } catch(error) { if (error.name !== 'NotFoundError') addLiveNotification(`Connection failed: ${error.message}`, 'error'); }
-        }
-
-        async function connectToDevice(device) {
-            if (!device) return;
+        // --- CONNECTION LOGIC ---
+        async function connectDevice() {
             setButtonLoading('connectBtn', true, 'Connecting...');
-            updateConnectionStatus('connecting');
             try {
-                btDevice = device;
-                btDevice.addEventListener('gattserverdisconnected', onDisconnected);
-                const server = await btDevice.gatt.connect();
-                const service = await server.getPrimaryService(UART_SERVICE_UUID);
-                
-                btTxCharacteristic = await service.getCharacteristic(UART_TX_CHAR_UUID);
-                btRxCharacteristic = await service.getCharacteristic(UART_RX_CHAR_UUID);
-
-                await btTxCharacteristic.startNotifications();
-                btTxCharacteristic.addEventListener('characteristicvaluechanged', onCharacteristicValueChanged);
-
-                updateConnectionStatus('connected');
-                addLiveNotification(`✅ Connected to ${btDevice.name || 'device'}`, 'success');
-                
-                // --- Sync Time ---
-                const unixTimestamp = Math.floor(Date.now() / 1000);
-                await sendCommand('SYNC_TIME', unixTimestamp);
-                addLiveNotification(`Synced device time to ${new Date(unixTimestamp * 1000).toLocaleTimeString()}`, 'success');
-
-            } catch(error) {
-                console.error("Connection failed:", error);
-                addLiveNotification(`Connection to ${device.name || 'device'} failed: ${error.message}`, 'error'); 
-                onDisconnected();
+                await connectBLE();
+            } catch (error) {
+                addLiveNotification(`Connection failed: ${error.message}`, 'error');
+                updateConnectionStatus('disconnected');
             } finally {
                 setButtonLoading('connectBtn', false, 'Connect to Device');
             }
         }
 
-        function onDisconnected() {
-            if(btDevice) btDevice.removeEventListener('gattserverdisconnected', onDisconnected);
-            btDevice = null;
-            btTxCharacteristic = null;
-            btRxCharacteristic = null;
-            updateConnectionStatus('disconnected');
-            addLiveNotification('🔴 Device disconnected', 'warning');
-        }
-
-        async function disconnect() {
-            if (btDevice?.gatt.connected) await btDevice.gatt.disconnect();
-            else onDisconnected();
-        }
-
-        function updateConnectionStatus(status = null) {
-            const isConnected = btDevice?.gatt.connected;
-            status = status || (isConnected ? 'connected' : 'disconnected');
-            document.getElementById('btStatusText').textContent = { connected: `Connected to ${btDevice?.name || 'device'}`, connecting: 'Connecting...', disconnected: 'Disconnected' }[status];
-            document.getElementById('btStatus').className = `connection-status ${status}`;
-            document.getElementById('disconnectBtn').style.display = isConnected ? 'inline-flex' : 'none';
-            const controlButtons = ['onBtn', 'offBtn', 'budgetBtn', 'deleteBudgetBtn', 'timerBtn', 'deleteTimerBtn', 'setKwhRateBtn', 'resetUsageBtn', 'resetTimeBtn', 'resetAllBtn', 'scheduleBtn', 'deleteScheduleBtn'];
-            controlButtons.forEach(id => { const btn = document.getElementById(id); if(btn) btn.disabled = !isConnected; });
-        }
-
-        function onCharacteristicValueChanged(event) {
-            const receivedChunk = new TextDecoder().decode(event.target.value);
-            btDataBuffer += receivedChunk; 
+        async function connectBLE() {
+            if (!navigator.bluetooth) throw new Error('Web Bluetooth is not supported on this browser.');
             
-            let newlineIndex;
-            while ((newlineIndex = btDataBuffer.indexOf('\n')) !== -1) {
-                const completeLine = btDataBuffer.substring(0, newlineIndex).trim(); 
-                btDataBuffer = btDataBuffer.substring(newlineIndex + 1); 
+            updateConnectionStatus('connecting', 'Bluetooth...');
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ name: 'ESP32_Power_Monitor' }],
+                optionalServices: [BLE_SERVICE_UUID]
+            });
+            
+            device.addEventListener('gattserverdisconnected', onBLEDisconnected);
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+            const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
+            bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
+            
+            await txChar.startNotifications();
+            txChar.addEventListener('characteristicvaluechanged', onBLEData);
+            
+            bleDevice = device;
+            connectionMode = 'ble';
+            updateConnectionStatus('connected', 'BLE Mode');
+            addLiveNotification('✅ Connected via Bluetooth.', 'success');
+            
+            document.getElementById('wifiSetupSection').style.display = 'block';
 
-                if (completeLine) { 
-                    console.log("Processed complete BT line:", completeLine); 
-                    if (completeLine.startsWith('ALERT:')) {
-                        handleAlert(completeLine);
-                    } else if (completeLine.startsWith('INFO:')) {
-                        addLiveNotification(completeLine.substring(completeLine.indexOf('|') + 1), 'info');
-                    } else if (completeLine.includes('V:') && completeLine.includes('I:')) {
-                        parseSensorData(completeLine);
+            connectMQTT();
+        }
+
+        function connectMQTT() {
+            const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
+            mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
+            
+            mqttClient.onConnectionLost = onMQTTConnectionLost;
+            mqttClient.onMessageArrived = onMQTTMessage;
+
+            mqttClient.connect({
+                userName: MQTT_USERNAME,
+                password: MQTT_PASSWORD,
+                useSSL: true,
+                onSuccess: onMQTTConnect,
+                onFailure: (err) => {
+                    addLiveNotification(`MQTT connection failed. Using BLE mode.`, 'warning');
+                }
+            });
+        }
+
+        function onMQTTConnect() {
+            mqttClient.subscribe(STATUS_TOPIC);
+            mqttClient.subscribe(LWT_TOPIC);
+            
+            connectionMode = 'mqtt';
+            updateConnectionStatus('connected', 'MQTT Online');
+            addLiveNotification('🚀 Connected to MQTT for remote access.', 'success');
+            document.getElementById('wifiSetupSection').style.display = 'none';
+        }
+        
+        async function disconnectDevice() {
+            if (mqttClient && mqttClient.isConnected()) mqttClient.disconnect();
+            if (bleDevice && bleDevice.gatt.connected) await bleDevice.gatt.disconnect();
+            updateConnectionStatus('disconnected');
+        }
+
+        function onBLEDisconnected() {
+            bleDevice = null;
+            bleRxCharacteristic = null;
+            if (connectionMode !== 'mqtt') {
+                updateConnectionStatus('disconnected');
+                addLiveNotification('Bluetooth connection lost.', 'warning');
+            }
+            document.getElementById('wifiSetupSection').style.display = 'none';
+        }
+        
+        function onMQTTConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                addLiveNotification(`MQTT connection lost: ${responseObject.errorMessage}`, 'warning');
+                if (bleDevice && bleDevice.gatt.connected) {
+                    connectionMode = 'ble';
+                    updateConnectionStatus('connected', 'BLE Mode');
+                } else {
+                    connectionMode = 'none';
+                    updateConnectionStatus('disconnected');
+                }
+            }
+        }
+
+        // --- DATA HANDLING & COMMANDS ---
+        function onMQTTMessage(message) {
+            try {
+                const metrics = JSON.parse(message.payloadString);
+                updateMetricsUI(metrics);
+                addDataPoint(parseFloat(metrics.P), parseFloat(metrics.COST), parseFloat(metrics.KWH));
+            } catch (e) { console.warn("Received non-JSON MQTT message:", message.payloadString); }
+        }
+        
+        let bleDataBuffer = '';
+        function onBLEData(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            bleDataBuffer += value;
+
+            let newlineIndex;
+            while ((newlineIndex = bleDataBuffer.indexOf('\n')) !== -1) {
+                const completeLine = bleDataBuffer.substring(0, newlineIndex).trim();
+                bleDataBuffer = bleDataBuffer.substring(newlineIndex + 1);
+
+                if (completeLine) {
+                    try {
+                        const metrics = JSON.parse(completeLine);
+                        updateMetricsUI(metrics);
+                        addDataPoint(parseFloat(metrics.P), parseFloat(metrics.COST), parseFloat(metrics.KWH));
+                    } catch (e) {
+                         console.warn("Received non-JSON BLE message:", completeLine);
                     }
                 }
             }
         }
 
-        function handleAlert(alertData) {
-            const alertMessage = alertData.substring(alertData.indexOf('|') + 1) || 'An alert was triggered.';
-            addLiveNotification(`🚨 ${alertMessage}`, 'warning');
-            showBrowserNotification('Vanilla 3000 Alert', alertMessage);
-        }
+        async function sendCommand(action, value = null) {
+            const command = (value !== null) ? `${action}:${value}` : `${action}`;
+            let sent = false;
 
-        function parseSensorData(data) {
-            const metrics = {};
-            data.split(',').forEach(part => {
-                const i = part.indexOf(':');
-                if (i > -1) {
-                    const key = part.substring(0, i).trim();
-                    const value = part.substring(i + 1).trim();
-                    metrics[key] = value;
+            if (connectionMode === 'mqtt' && mqttClient && mqttClient.isConnected()) {
+                const message = new Paho.MQTT.Message(command);
+                message.destinationName = COMMAND_TOPIC;
+                mqttClient.send(message);
+                sent = true;
+            } else if (bleDevice && bleDevice.gatt.connected && bleRxCharacteristic) {
+                try {
+                    await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(command + '\n'));
+                    sent = true;
+                } catch (error) {
+                    addLiveNotification(`BLE command failed: ${error.message}`, 'error');
                 }
-            });
-            updateMetricsUI(metrics);
-            const power = parseFloat(metrics.P);
-            const cost = parseFloat(metrics.COST);
-            const kwh = parseFloat(metrics.KWH);
-            if (!isNaN(power) && !isNaN(cost) && !isNaN(kwh)) {
-                addDataPoint(power, cost, kwh);
+            }
+            
+            if (!sent) {
+                 addLiveNotification('Cannot send command. No active connection.', 'error');
+            }
+        }
+        
+        function sendWifiCredentials() {
+            const ssid = document.getElementById('wifiSsidInput').value;
+            const pass = document.getElementById('wifiPassInput').value;
+            if (!ssid) return addLiveNotification('Please enter a Wi-Fi Name (SSID).', 'error');
+            
+            const commandValue = `${ssid},${pass}`;
+            // Provisioning is always sent over BLE
+            if (bleDevice && bleDevice.gatt.connected) {
+                sendCommand('PROVISION', commandValue);
+                addLiveNotification('Wi-Fi credentials sent. The device will now reboot.', 'info');
             } else {
-                console.error("Invalid numeric data for chart received:", metrics);
+                addLiveNotification('Must be connected via Bluetooth to send Wi-Fi credentials.', 'error');
             }
         }
 
+        // --- UI UPDATE FUNCTIONS ---
         function updateMetricsUI(data) {
             if (data.V !== undefined) document.getElementById('voltage').textContent = parseFloat(data.V).toFixed(1);
             if (data.I !== undefined) document.getElementById('current').textContent = parseFloat(data.I).toFixed(2);
             if (data.P !== undefined) document.getElementById('power').textContent = parseFloat(data.P).toFixed(1);
             if (data.KWH !== undefined) document.getElementById('energy').textContent = parseFloat(data.KWH).toFixed(3);
-            if (data.COST !== undefined) document.getElementById('cost').textContent = `₱${parseFloat(data.COST).toFixed(2)}`;
-            if (data.Relay !== undefined) document.getElementById('usageStatus').textContent = `Device: ${data.Relay}`;
+            if (data.COST !== undefined) document.getElementById('cost').textContent = parseFloat(data.COST).toFixed(2);
+            if (data.Relay !== undefined) document.getElementById('usageStatus').textContent = `Device is currently ${data.Relay}`;
             if (data.RUNTIME !== undefined) {
                 const s = parseInt(data.RUNTIME, 10);
                 if (!isNaN(s)) {
@@ -402,6 +465,7 @@
                 document.getElementById('remainingTimer').textContent = `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor(s%3600/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
                 timerDisplay.style.display = 'flex';
             } else { timerDisplay.style.display = 'none'; }
+            
             const budgetDisplay = document.getElementById('remainingBudgetDisplay');
             if (data.REM_BUDGET && parseFloat(data.REM_BUDGET) > 0) {
                 document.getElementById('remainingBudget').textContent = `₱${parseFloat(data.REM_BUDGET).toFixed(2)}`;
@@ -416,28 +480,47 @@
                 const onAmPm = parseInt(onTimeParts[0]) >= 12 ? 'PM' : 'AM';
                 const offHour12 = parseInt(offTimeParts[0]) % 12 || 12;
                 const offAmPm = parseInt(offTimeParts[0]) >= 12 ? 'PM' : 'AM';
-                document.getElementById('activeSchedule').textContent = `ON: ${onHour12}:${onTimeParts[1].padStart(2, '0')} ${onAmPm} | OFF: ${offHour12}:${offTimeParts[1].padStart(2, '0')} ${offAmPm}`;
+                document.getElementById('activeSchedule').textContent = `ON: ${onHour12}:${onTimeParts[1].padStart(2,'0')} ${onAmPm} | OFF: ${offHour12}:${offTimeParts[1].padStart(2,'0')} ${offAmPm}`;
                 scheduleDisplay.style.display = 'flex';
             } else {
                 scheduleDisplay.style.display = 'none';
             }
         }
+        
+        function updateConnectionStatus(status, text) {
+            const statusEl = document.getElementById('connectionStatus');
+            const statusTextEl = document.getElementById('connectionStatusText');
+            statusEl.className = `connection-status ${status}`;
+            statusTextEl.textContent = text || 'Offline';
+            const isConnected = status === 'connected';
+            document.getElementById('disconnectBtn').style.display = isConnected ? 'flex' : 'none';
+            document.getElementById('connectBtn').style.display = isConnected ? 'none' : 'flex';
 
-        async function sendCommand(action, value = null) {
-            if (!btDevice?.gatt.connected || !btRxCharacteristic) return addLiveNotification('Not connected.', 'error');
-            try {
-                const command = (value !== null) ? `${action}:${value}\n` : `${action}\n`;
-                await btRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(command));
-            } catch (error) { addLiveNotification(`Command failed: ${error.message}`, 'error'); }
+            const controlButtons = ['onBtn', 'offBtn', 'budgetBtn', 'deleteBudgetBtn', 'timerBtn', 'deleteTimerBtn', 'setKwhRateBtn', 'resetUsageBtn', 'resetTimeBtn', 'resetAllBtn', 'scheduleBtn', 'deleteScheduleBtn'];
+            controlButtons.forEach(id => { const btn = document.getElementById(id); if(btn) btn.disabled = !isConnected; });
         }
-
+        
+        // --- UI HELPER FUNCTIONS ---
+        function setButtonLoading(id, loading, text) {
+            const btn = document.getElementById(id);
+            btn.disabled = loading;
+            btn.innerHTML = loading ? `<div class="spinner"></div> <span>${text}</span>` : text;
+        }
+        function addLiveNotification(message, type = 'info') {
+            const panel = document.getElementById('notificationsList');
+            const item = document.createElement('div');
+            item.className = `notification notification-${type}`;
+            item.innerHTML = `<strong>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong> - ${message}`;
+            panel.insertBefore(item, panel.firstChild);
+            if (panel.children.length > 20) panel.removeChild(panel.lastChild);
+        }
         function setKwhRate() {
             const rateString = document.getElementById('kwhRateInput').value;
             if (/^[0-9]*\.?[0-9]+$/.test(rateString) && parseFloat(rateString) > 0) {
                 sendCommand('RATE', rateString);
                 localStorage.setItem('kwhRate', rateString);
                 addLiveNotification(`kWh rate set to ₱${rateString}`, 'success');
-            } else { addLiveNotification('Invalid rate. Must be a number > 0.', 'error'); }
+            } else { addLiveNotification('Invalid rate. Must be a positive number.', 'error'); }
         }
         function setBudget() { 
             const budgetInput = document.getElementById('budgetInput');
@@ -446,129 +529,37 @@
                 sendCommand('SET_BUDGET', b);  
                 budgetInput.value = ''; 
             } else { 
-                addLiveNotification('Please enter a budget > 0.', 'error'); 
+                addLiveNotification('Please enter a budget greater than 0.', 'error'); 
             } 
         }
         function deleteBudget() { sendCommand('SET_BUDGET', 0); addLiveNotification('Active budget deleted.', 'info'); }
-        
         function setTimer() {
-            const hInput = document.getElementById('timerHoursInput');
-            const mInput = document.getElementById('timerMinutesInput');
-            const h = parseInt(hInput.value || '0', 10);
-            const m = parseInt(mInput.value || '0', 10);
+            const h = parseInt(document.getElementById('timerHoursInput').value || '0', 10);
+            const m = parseInt(document.getElementById('timerMinutesInput').value || '0', 10);
             const totalMinutes = (h * 60) + m;
             if (totalMinutes > 0) {
                 sendCommand('SET_TIMER', totalMinutes);
                 addLiveNotification(`Timer set for ${h}h ${m}m.`, 'success');
-                hInput.value = '';
-                mInput.value = '';
+                document.getElementById('timerHoursInput').value = '';
+                document.getElementById('timerMinutesInput').value = '';
             } else {
                 addLiveNotification('Please enter a duration greater than 0.', 'error');
             }
         }
         function deleteTimer() { sendCommand('SET_TIMER', 0); addLiveNotification('Active timer deleted.', 'info'); }
-        
         function setSchedule() {
-            const onTimeInput = document.getElementById('scheduleOnTime');
-            const offTimeInput = document.getElementById('scheduleOffTime');
-            const onTimeValue = onTimeInput.value;
-            const offTimeValue = offTimeInput.value;
-
-            if (!onTimeValue || !offTimeValue) {
-                 return addLiveNotification('Please select both an ON and OFF time.', 'error');
-            }
-
-            const [onHour, onMin] = onTimeValue.split(':').map(Number);
-            const [offHour, offMin] = offTimeValue.split(':').map(Number);
-            
-            const scheduleString = `${onHour},${onMin},${offHour},${offMin}`;
-            sendCommand('SCHED', scheduleString);
+            const onTime = document.getElementById('scheduleOnTime').value;
+            const offTime = document.getElementById('scheduleOffTime').value;
+            if (!onTime || !offTime) return addLiveNotification('Please select both ON and OFF times.', 'error');
+            const [onH, onM] = onTime.split(':').map(Number);
+            const [offH, offM] = offTime.split(':').map(Number);
+            sendCommand('SCHED', `${onH},${onM},${offH},${offM}`);
             addLiveNotification('Schedule sent to device.', 'success');
-            onTimeInput.value = '';
-            offTimeInput.value = '';
         }
-
-        function deleteSchedule() {
-            sendCommand('DEL_SCHED');
-            addLiveNotification('Schedule deleted.', 'info');
-        }
-        
+        function deleteSchedule() { sendCommand('DEL_SCHED'); addLiveNotification('Schedule deleted.', 'info'); }
         function confirmResetAll() { if(confirm("Are you sure? This will clear all usage data and settings on the device.")) sendCommand('RESET_ALL'); }
 
-        function initializeChart() {
-            const ctx = document.getElementById('usageChart').getContext('2d');
-            chart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'hour' } }, y: { beginAtZero: true, title: { display: true } } },
-                    plugins: { legend: { display: false }, zoom: { pan: { enabled: true, mode: 'x', threshold: 5 }, zoom: { wheel: { enabled: true, onZoomComplete: ({chart}) => {chart.update('none')} }, pinch: { enabled: true }, mode: 'x' } } }
-                }
-            });
-            toggleChartType(currentChartType);
-            setChartTimeRange('All');
-        }
-
-        function addDataPoint(power, cost, kwh) {
-            const now = new Date(), nowISO = now.toISOString();
-            chartData.labels.push(nowISO); chartData.power.push(power); chartData.cost.push(cost); chartData.kwh.push(kwh);
-            while (chartData.labels.length > 1440) { Object.keys(chartData).forEach(key => chartData[key].shift()); }
-            Object.keys(chartData).forEach(key => localStorage.setItem(`chartData_${key}`, JSON.stringify(chartData[key])));
-            if (chart?.data.datasets.length > 0) {
-                chart.data.labels.push(now);
-                chart.data.datasets[0].data.push(chartData[currentChartType].slice(-1)[0]);
-                while(chart.data.labels.length > 1440) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-                if(!chart.isZoomedOrPanned()) chart.update('none');
-            }
-        }
-
-        function toggleChartType(type) {
-            currentChartType = type;
-            document.querySelectorAll('#chartTypePower, #chartTypeKwh, #chartTypeCost').forEach(b => b.classList.remove('active'));
-            document.getElementById(`chartType${type.charAt(0).toUpperCase() + type.slice(1)}`)?.classList.add('active');
-            updateChart();
-        }
-
-        function setChartTimeRange(period) {
-            if (!chart) return;
-            const now = new Date();
-            let minTime;
-            const timeRanges = {
-                '1H': 60 * 60 * 1000,
-                '24H': 24 * 60 * 60 * 1000,
-                '7D': 7 * 24 * 60 * 60 * 1000
-            };
-            minTime = (period === 'All') ? null : new Date(now.getTime() - timeRanges[period]);
-
-            chart.options.scales.x.min = minTime;
-            chart.options.scales.x.max = now;
-            chart.update('normal');
-
-            document.querySelectorAll('.chart-controls #timeRange1H, #timeRange24H, #timeRange7D, #timeRangeAll').forEach(b => b.classList.remove('active'));
-            document.getElementById(`timeRange${period}`).classList.add('active');
-        }
-
-        function updateChart() {
-            if (!chart) return;
-            const labelMap = { power: 'Power (W)', kwh: 'Energy (kWh)', cost: 'Cost (PHP)' };
-            const colorMap = { power: '#667eea', kwh: '#38a169', cost: '#ed8936' };
-            chart.data.labels = chartData.labels.map(l => new Date(l));
-            chart.data.datasets = [{
-                data: chartData[currentChartType], label: labelMap[currentChartType], borderColor: colorMap[currentChartType],
-                backgroundColor: colorMap[currentChartType] + '1A', tension: 0.1, fill: true, pointRadius: 0, borderWidth: 1.5
-            }];
-            chart.options.scales.y.title.text = labelMap[currentChartType];
-            chart.update('none');
-        }
-
-        function resetChartZoom() { if(chart) { chart.resetZoom(); setChartTimeRange('All'); } }
-
-        function addLiveNotification(message, type) {
-            const panel = document.getElementById('notificationsList'), item = document.createElement('div');
-            item.className = `notification notification-${type}`;
-            item.innerHTML = `<strong>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</strong> - ${message}`;
-            panel.insertBefore(item, panel.firstChild);
-            if (panel.children.length > 20) panel.removeChild(panel.lastChild);
-        }
-        function setButtonLoading(id, loading, text) { const btn = document.getElementById(id); btn.disabled = loading; btn.innerHTML = loading ? `<div class="spinner"></div> ${text}` : text; }
-        
+        // --- THEME & FULLSCREEN ---
         function initializeTheme() {
             if (isDarkMode) {
                 document.documentElement.setAttribute('data-theme', 'dark');
@@ -578,14 +569,101 @@
                 document.getElementById('themeToggle').textContent = '🌙';
             }
         }
-
         function toggleDarkMode() {
             isDarkMode = !isDarkMode;
             localStorage.setItem('darkMode', isDarkMode);
             initializeTheme();
         }
-
         function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+        
+        // --- CHART LOGIC ---
+        function initializeChart() {
+            const ctx = document.getElementById('usageChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line', data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'hour' } }, y: { beginAtZero: true, title: { display: true } } },
+                    plugins: { legend: { display: false }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }
+                }
+            });
+            toggleChartType(currentChartType);
+            setChartTimeRange('All');
+        }
+        function addDataPoint(power, cost, kwh) {
+            const now = new Date();
+            const nowISO = now.toISOString();
+
+            chartData.labels.push(nowISO);
+            chartData.power.push(power);
+            chartData.cost.push(cost);
+            chartData.kwh.push(kwh);
+
+            while (chartData.labels.length > 2880) { // Keep last 2 days of 1-min data
+                Object.keys(chartData).forEach(key => chartData[key].shift());
+            }
+
+            if (chart?.data.datasets.length > 0) {
+                chart.data.labels.push(now);
+                chart.data.datasets[0].data.push({ x: now.getTime(), y: arguments[currentChartType === 'power' ? 0 : currentChartType === 'cost' ? 1 : 2] });
+                
+                while(chart.data.labels.length > 2880) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                if(!chart.isZoomedOrPanned()) {
+                    chart.update('none');
+                }
+            }
+        }
+        function toggleChartType(type) {
+            currentChartType = type;
+            document.querySelectorAll('.chart-controls .chart-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`chartType${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
+            updateChart();
+        }
+        function setChartTimeRange(period) {
+            if (!chart) return;
+            const now = luxon.DateTime.now();
+            let min;
+            switch(period) {
+                case '1H': min = now.minus({ hours: 1 }); break;
+                case '24H': min = now.minus({ days: 1 }); break;
+                case '7D': min = now.minus({ weeks: 1 }); break;
+                case 'All':
+                default: min = chartData.labels.length > 0 ? luxon.DateTime.fromISO(chartData.labels[0]) : now.minus({days: 1}); break;
+            }
+            chart.options.scales.x.min = min.toMillis();
+            chart.options.scales.x.max = now.toMillis();
+            chart.update();
+            document.querySelectorAll('.chart-controls #timeRange1H, #timeRange24H, #timeRange7D, #timeRangeAll').forEach(b => b.classList.remove('active'));
+            document.getElementById(`timeRange${period}`).classList.add('active');
+        }
+        function updateChart() {
+            if (!chart) return;
+            const labelMap = { power: 'Power (W)', kwh: 'Energy (kWh)', cost: 'Cost (PHP)' };
+            const colorMap = { power: '#667eea', kwh: '#38a169', cost: '#ed8936' };
+            
+            const data = chartData.labels.map((label, index) => ({
+                x: luxon.DateTime.fromISO(label).toMillis(),
+                y: chartData[currentChartType][index]
+            }));
+
+            chart.data.datasets = [{
+                data: data,
+                label: labelMap[currentChartType],
+                borderColor: colorMap[currentChartType],
+                backgroundColor: colorMap[currentChartType] + '1A',
+                tension: 0.1,
+                fill: true,
+                pointRadius: 0,
+                borderWidth: 1.5
+            }];
+            chart.options.scales.y.title.text = labelMap[currentChartType];
+            chart.update();
+        }
+        function resetChartZoom() { if(chart) { chart.resetZoom(); setChartTimeRange('All'); } }
+
     </script>
 </body>
 </html>
+

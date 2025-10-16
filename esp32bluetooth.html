@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,72 +36,475 @@
             --shadow-color: rgba(0, 0, 0, 0.3);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-        body { background: var(--primary-gradient); min-height: 100vh; padding: 1rem; color: var(--text-primary); transition: all 0.3s ease; }
-        .container { max-width: 1200px; margin: 0 auto; background: var(--card-bg); border-radius: 1.5rem; padding: 2rem; box-shadow: 0 20px 40px var(--shadow-color); backdrop-filter: blur(10px); min-height: calc(100vh - 2rem); display: flex; flex-direction: column; }
-        .header { text-align: center; margin-bottom: 2rem; position: relative; }
-        .header h1 { font-size: 3rem; font-weight: 800; background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.5rem; }
-        .header p { font-size: 1rem; color: var(--text-secondary); }
-        .header-controls { position: absolute; top: 0; right: 0; display: flex; gap: 0.75rem; }
-        .header-btn { width: 3rem; height: 3rem; border-radius: 50%; border: 2px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; transition: all 0.3s ease; }
-        .header-btn:hover { background: var(--primary-gradient); color: white; border-color: transparent; }
-        .main-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; flex-grow: 1; }
-        .section { background: var(--card-bg); border-radius: 1rem; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-color); }
-        .left-column .section:last-child, .right-column .section:last-child { margin-bottom: 0; }
-        .section-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
-        .status-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .metric-card { background: var(--primary-gradient); color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; transition: transform 0.2s ease; }
-        .metric-card:hover { transform: translateY(-2px); }
-        .metric-label { font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem; }
-        .metric-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
-        .metric-unit { font-size: 0.875rem; opacity: 0.8; }
-        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-width: 100px; }
-        .btn-primary { background: var(--primary-gradient); color: white; }
-        .btn-success { background: linear-gradient(135deg, #48bb78, #38a169); color: white; }
-        .btn-danger { background: linear-gradient(135deg, #f56565, #e53e3e); color: white; }
-        .btn-warning { background: linear-gradient(135deg, #ed8936, #dd6b20); color: white; }
-        .btn-secondary { background: linear-gradient(135deg, #a0aec0, #718096); color: white; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .input-field { width: 100%; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary); font-size: 1rem; transition: border-color 0.3s ease; }
-        .input-field:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
-        .control-group, .input-group { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
-        .control-group { flex-wrap: wrap; }
-        .input-group { align-items: center; }
-        .control-group .btn, .input-group .input-field { flex: 1; }
-        .input-group .btn { flex-grow: 0; }
-        .connection-status { padding: 1rem; border-radius: 0.75rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; font-weight: 600; transition: all 0.3s ease;}
-        .status-dot { width: 12px; height: 12px; border-radius: 50%; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .connection-status.connected { background: rgba(72, 187, 120, 0.1); color: var(--success-color); border-left: 5px solid var(--success-color); }
-        .connection-status.connecting { background: rgba(237, 137, 54, 0.1); color: var(--warning-color); border-left: 5px solid var(--warning-color); }
-        .connection-status.disconnected { background: rgba(245, 101, 101, 0.1); color: var(--error-color); border-left: 5px solid var(--error-color); }
-        .connection-status.connected .status-dot { background-color: var(--success-color); }
-        .connection-status.connecting .status-dot { background-color: var(--warning-color); }
-        .connection-status.disconnected .status-dot { background-color: var(--error-color); }
-        .chart-container { position: relative; height: 400px; margin-top: 1rem; }
-        .chart-controls { display: flex; gap: 0.5rem; margin-top: 1.5rem; flex-wrap: wrap; justify-content: center; }
-        .chart-btn { padding: 0.5rem 1rem; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); border-radius: 0.5rem; cursor: pointer; transition: all 0.3s ease; }
-        .chart-btn.active, .chart-btn:hover { background: var(--primary-gradient); color: white; border-color: transparent; }
-        .notifications-panel { max-height: 250px; overflow-y: auto; padding-right: 10px; }
-        .notification { padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 0.5rem; border-left: 4px solid; animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .notification-info { background: rgba(66, 153, 225, 0.1); border-color: var(--info-color); color: var(--info-color); }
-        .notification-success { background: rgba(72, 187, 120, 0.1); border-color: var(--success-color); color: var(--success-color); }
-        .notification-warning { background: rgba(237, 137, 54, 0.1); border-color: var(--warning-color); color: var(--warning-color); }
-        .notification-error { background: rgba(245, 101, 101, 0.1); border-color: var(--error-color); color: var(--error-color); }
-        .usage-tracker { text-align: center; padding: 2rem; background: var(--primary-gradient); color: white; border-radius: 1rem; margin-bottom: 1.5rem; }
-        .usage-time { font-size: 3rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255, 255, 255, 0.3); border-top: 2px solid white; border-radius: 50%; animation: spin 1s linear infinite; }
-        .budget-time-display { background: rgba(118, 75, 162, 0.1); border-radius: 0.75rem; padding: 1rem; margin-top: 0.75rem; text-align: center; font-weight: 600; display: flex; flex-direction: column; gap: 0.5rem; }
-        .budget-time-display .label { font-size: 0.8rem; color: var(--text-secondary); }
-        .budget-time-display .value { font-size: 1.25rem; font-weight: 800; }
-        .schedule-group { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: center; margin-bottom: 1rem;}
-        .schedule-group label { font-weight: 600; color: var(--text-secondary); }
-        @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } .header-controls { position: static; justify-content: center; margin-top: 1rem; } }
-        @media (max-width: 640px) { body { padding: .25rem; } .container { padding: .75rem; } .header h1 { font-size: 1.8rem; } .header p { font-size: .85rem; } }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: var(--primary-gradient);
+            min-height: 100vh;
+            padding: 1rem;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 40px var(--shadow-color);
+            backdrop-filter: blur(10px);
+            min-height: calc(100vh - 2rem);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .header-controls {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .header-btn {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: all 0.3s ease;
+        }
+
+        .header-btn:hover {
+            background: var(--primary-gradient);
+            color: white;
+            border-color: transparent;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        .section {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px var(--shadow-color);
+        }
+
+        .left-column .section:last-child,
+        .right-column .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-unit {
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            min-width: 100px;
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565, #e53e3e);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ed8936, #dd6b20);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #a0aec0, #718096);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 0.5rem;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .control-group,
+        .input-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .control-group {
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            align-items: center;
+        }
+
+        .control-group .btn,
+        .input-group .input-field {
+            flex: 1;
+        }
+
+        .input-group .btn {
+            flex-grow: 0;
+        }
+
+        .connection-status {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .connection-status.connected {
+            background: rgba(72, 187, 120, 0.1);
+            color: var(--success-color);
+            border-left: 5px solid var(--success-color);
+        }
+
+        .connection-status.connecting {
+            background: rgba(237, 137, 54, 0.1);
+            color: var(--warning-color);
+            border-left: 5px solid var(--warning-color);
+        }
+
+        .connection-status.disconnected {
+            background: rgba(245, 101, 101, 0.1);
+            color: var(--error-color);
+            border-left: 5px solid var(--error-color);
+        }
+
+        .connection-status.connected .status-dot {
+            background-color: var(--success-color);
+        }
+
+        .connection-status.connecting .status-dot {
+            background-color: var(--warning-color);
+        }
+
+        .connection-status.disconnected .status-dot {
+            background-color: var(--error-color);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 1rem;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .chart-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .chart-btn.active,
+        .chart-btn:hover {
+            background: var(--primary-gradient);
+            color: white;
+            border-color: transparent;
+        }
+
+        .notifications-panel {
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .notification {
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-left: 4px solid;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .notification-info {
+            background: rgba(66, 153, 225, 0.1);
+            border-color: var(--info-color);
+            color: var(--info-color);
+        }
+
+        .notification-success {
+            background: rgba(72, 187, 120, 0.1);
+            border-color: var(--success-color);
+            color: var(--success-color);
+        }
+
+        .notification-warning {
+            background: rgba(237, 137, 54, 0.1);
+            border-color: var(--warning-color);
+            color: var(--warning-color);
+        }
+
+        .notification-error {
+            background: rgba(245, 101, 101, 0.1);
+            border-color: var(--error-color);
+            color: var(--error-color);
+        }
+
+        .usage-tracker {
+            text-align: center;
+            padding: 2rem;
+            background: var(--primary-gradient);
+            color: white;
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .usage-time {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .budget-time-display {
+            background: rgba(118, 75, 162, 0.1);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            text-align: center;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .budget-time-display .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .budget-time-display .value {
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+
+        .schedule-group {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .schedule-group label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-controls {
+                position: static;
+                justify-content: center;
+                margin-top: 1rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: .25rem;
+            }
+
+            .container {
+                padding: .75rem;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .header p {
+                font-size: .85rem;
+            }
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -128,7 +532,7 @@
 
                 <div class="section" id="wifiSetupSection" style="display: none;">
                     <div class="section-title">🌐 Wi-Fi Provisioning</div>
-                     <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
+                    <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
                     <div class="input-group">
                         <input type="text" id="wifiSsidInput" class="input-field" placeholder="Wi-Fi Name (SSID)">
                     </div>
@@ -165,8 +569,8 @@
                         <input type="time" id="scheduleOffTime" class="input-field">
                     </div>
                     <div class="control-group">
-                         <button class="btn btn-primary" onclick="setSchedule()" id="scheduleBtn">Set Schedule</button>
-                         <button class="btn btn-danger" onclick="deleteSchedule()" id="deleteScheduleBtn">Delete Schedule</button>
+                        <button class="btn btn-primary" onclick="setSchedule()" id="scheduleBtn">Set Schedule</button>
+                        <button class="btn btn-danger" onclick="deleteSchedule()" id="deleteScheduleBtn">Delete Schedule</button>
                     </div>
                     <div id="activeScheduleDisplay" class="budget-time-display" style="display:none;">
                         <span class="label">Active Schedule</span>
@@ -215,16 +619,41 @@
 
             <div class="right-column">
                 <div class="status-panel">
-                    <div class="metric-card"><div class="metric-label">Voltage</div><div class="metric-value" id="voltage">0.0</div><div class="metric-unit">V</div></div>
-                    <div class="metric-card"><div class="metric-label">Current</div><div class="metric-value" id="current">0.00</div><div class="metric-unit">A</div></div>
-                    <div class="metric-card"><div class="metric-label">Power</div><div class="metric-value" id="power">0.0</div><div class="metric-unit">W</div></div>
-                    <div class="metric-card"><div class="metric-label">Total kWh</div><div class="metric-value" id="energy">0.000</div><div class="metric-unit">kWh</div></div>
-                    <div class="metric-card"><div class="metric-label">Total Cost</div><div class="metric-value" id="cost">₱0.00</div><div class="metric-unit">PHP</div></div>
+                    <div class="metric-card">
+                        <div class="metric-label">Voltage</div>
+                        <div class="metric-value" id="voltage">0.0</div>
+                        <div class="metric-unit">V</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Current</div>
+                        <div class="metric-value" id="current">0.00</div>
+                        <div class="metric-unit">A</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Power</div>
+                        <div class="metric-value" id="power">0.0</div>
+                        <div class="metric-unit">W</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Total kWh</div>
+                        <div class="metric-value" id="energy">0.000</div>
+                        <div class="metric-unit">kWh</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Total Cost</div>
+                        <div class="metric-value" id="cost">₱0.00</div>
+                        <div class="metric-unit">PHP</div>
+                    </div>
                 </div>
-                <div class="usage-tracker"><div class="usage-time" id="usageTime">00:00:00</div><div id="usageStatus">Device Status</div></div>
+                <div class="usage-tracker">
+                    <div class="usage-time" id="usageTime">00:00:00</div>
+                    <div id="usageStatus">Device Status</div>
+                </div>
                 <div class="section">
                     <div class="section-title">📊 Energy Usage Chart</div>
-                    <div class="chart-container"><canvas id="usageChart"></canvas></div>
+                    <div class="chart-container">
+                        <canvas id="usageChart"></canvas>
+                    </div>
                     <div class="chart-controls">
                         <button class="chart-btn" onclick="toggleChartType('power')" id="chartTypePower">Power</button>
                         <button class="chart-btn" onclick="toggleChartType('kwh')" id="chartTypeKwh">kWh</button>
@@ -236,20 +665,23 @@
                         <button class="chart-btn btn-secondary" onclick="resetChartZoom()" id="resetZoomBtn">Reset View</button>
                     </div>
                 </div>
-                <div class="section"><div class="section-title">🔔 Live Notifications</div><div class="notifications-panel" id="notificationsList"></div></div>
+                <div class="section">
+                    <div class="section-title">🔔 Live Notifications</div>
+                    <div class="notifications-panel" id="notificationsList"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         // --- CONFIGURATION ---
-        const MQTT_BROKER   = "a656476c0c1f45d88ec84cf10f7dd1b4.s1.eu.hivemq.cloud";
-        const MQTT_PORT     = 8883;
+        const MQTT_BROKER = "a656476c0c1f45d88ec84cf10f7dd1b4.s1.eu.hivemq.cloud";
+        const MQTT_PORT = 8883;
         const MQTT_USERNAME = "Arkrne.";
         const MQTT_PASSWORD = "Arkrne123!@#";
-        const STATUS_TOPIC   = "smartplug/status";
-        const COMMAND_TOPIC  = "smartplug/command";
-        const LWT_TOPIC      = "smartplug/connection";
+        const STATUS_TOPIC = "smartplug/status";
+        const COMMAND_TOPIC = "smartplug/command";
+        const LWT_TOPIC = "smartplug/connection";
         const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
@@ -268,7 +700,7 @@
             kwh: [],
             labels: []
         };
-        
+
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             initializeTheme();
@@ -291,43 +723,40 @@
             }
         }
 
-async function connectBLE() {
-    if (!navigator.bluetooth) throw new Error('Web Bluetooth is not supported on this browser.');
-    
-    updateConnectionStatus('connecting', 'Bluetooth...');
-    
-    // --- FIX: Change the filter to look for the Service UUID ---
-    const device = await navigator.bluetooth.requestDevice({
-        filters: [{ 
-            services: [BLE_SERVICE_UUID] 
-        }],
-        optionalServices: [BLE_SERVICE_UUID] // Keep this to access the service after connection
-    });
-    // --- END OF FIX ---
-    
-    device.addEventListener('gattserverdisconnected', onBLEDisconnected);
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-    const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
-    bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
-    
-    await txChar.startNotifications();
-    txChar.addEventListener('characteristicvaluechanged', onBLEData);
-    
-    bleDevice = device;
-    connectionMode = 'ble';
-    updateConnectionStatus('connected', 'BLE Mode');
-    addLiveNotification('✅ Connected via Bluetooth.', 'success');
-    
-    document.getElementById('wifiSetupSection').style.display = 'block';
+        async function connectBLE() {
+            if (!navigator.bluetooth) throw new Error('Web Bluetooth is not supported on this browser.');
 
-    connectMQTT();
-}
+            updateConnectionStatus('connecting', 'Bluetooth...');
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{
+                    name: 'ESP32_Power_Monitor'
+                }],
+                optionalServices: [BLE_SERVICE_UUID]
+            });
+
+            device.addEventListener('gattserverdisconnected', onBLEDisconnected);
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+            const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
+            bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
+
+            await txChar.startNotifications();
+            txChar.addEventListener('characteristicvaluechanged', onBLEData);
+
+            bleDevice = device;
+            connectionMode = 'ble';
+            updateConnectionStatus('connected', 'BLE Mode');
+            addLiveNotification('✅ Connected via Bluetooth.', 'success');
+
+            document.getElementById('wifiSetupSection').style.display = 'block';
+
+            connectMQTT();
+        }
 
         function connectMQTT() {
             const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
             mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, clientId);
-            
+
             mqttClient.onConnectionLost = onMQTTConnectionLost;
             mqttClient.onMessageArrived = onMQTTMessage;
 
@@ -345,13 +774,13 @@ async function connectBLE() {
         function onMQTTConnect() {
             mqttClient.subscribe(STATUS_TOPIC);
             mqttClient.subscribe(LWT_TOPIC);
-            
+
             connectionMode = 'mqtt';
             updateConnectionStatus('connected', 'MQTT Online');
             addLiveNotification('🚀 Connected to MQTT for remote access.', 'success');
             document.getElementById('wifiSetupSection').style.display = 'none';
         }
-        
+
         async function disconnectDevice() {
             if (mqttClient && mqttClient.isConnected()) mqttClient.disconnect();
             if (bleDevice && bleDevice.gatt.connected) await bleDevice.gatt.disconnect();
@@ -367,7 +796,7 @@ async function connectBLE() {
             }
             document.getElementById('wifiSetupSection').style.display = 'none';
         }
-        
+
         function onMQTTConnectionLost(responseObject) {
             if (responseObject.errorCode !== 0) {
                 addLiveNotification(`MQTT connection lost: ${responseObject.errorMessage}`, 'warning');
@@ -387,10 +816,13 @@ async function connectBLE() {
                 const metrics = JSON.parse(message.payloadString);
                 updateMetricsUI(metrics);
                 addDataPoint(parseFloat(metrics.P), parseFloat(metrics.COST), parseFloat(metrics.KWH));
-            } catch (e) { console.warn("Received non-JSON MQTT message:", message.payloadString); }
+            } catch (e) {
+                console.warn("Received non-JSON MQTT message:", message.payloadString);
+            }
         }
-        
+
         let bleDataBuffer = '';
+
         function onBLEData(event) {
             const value = new TextDecoder().decode(event.target.value);
             bleDataBuffer += value;
@@ -406,7 +838,7 @@ async function connectBLE() {
                         updateMetricsUI(metrics);
                         addDataPoint(parseFloat(metrics.P), parseFloat(metrics.COST), parseFloat(metrics.KWH));
                     } catch (e) {
-                         console.warn("Received non-JSON BLE message:", completeLine);
+                        console.warn("Received non-JSON BLE message:", completeLine);
                     }
                 }
             }
@@ -429,17 +861,17 @@ async function connectBLE() {
                     addLiveNotification(`BLE command failed: ${error.message}`, 'error');
                 }
             }
-            
+
             if (!sent) {
-                 addLiveNotification('Cannot send command. No active connection.', 'error');
+                addLiveNotification('Cannot send command. No active connection.', 'error');
             }
         }
-        
+
         function sendWifiCredentials() {
             const ssid = document.getElementById('wifiSsidInput').value;
             const pass = document.getElementById('wifiPassInput').value;
             if (!ssid) return addLiveNotification('Please enter a Wi-Fi Name (SSID).', 'error');
-            
+
             const commandValue = `${ssid},${pass}`;
             // Provisioning is always sent over BLE
             if (bleDevice && bleDevice.gatt.connected) {
@@ -469,14 +901,18 @@ async function connectBLE() {
                 const s = parseInt(data.REM_TIME, 10);
                 document.getElementById('remainingTimer').textContent = `${Math.floor(s/3600).toString().padStart(2,'0')}:${Math.floor(s%3600/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
                 timerDisplay.style.display = 'flex';
-            } else { timerDisplay.style.display = 'none'; }
-            
+            } else {
+                timerDisplay.style.display = 'none';
+            }
+
             const budgetDisplay = document.getElementById('remainingBudgetDisplay');
             if (data.REM_BUDGET && parseFloat(data.REM_BUDGET) > 0) {
                 document.getElementById('remainingBudget').textContent = `₱${parseFloat(data.REM_BUDGET).toFixed(2)}`;
                 budgetDisplay.style.display = 'flex';
-            } else { budgetDisplay.style.display = 'none'; }
-            
+            } else {
+                budgetDisplay.style.display = 'none';
+            }
+
             const scheduleDisplay = document.getElementById('activeScheduleDisplay');
             if (data.SCHED_ACTIVE && parseInt(data.SCHED_ACTIVE) === 1) {
                 const onTimeParts = data.SCHED_ON.split(':');
@@ -491,7 +927,7 @@ async function connectBLE() {
                 scheduleDisplay.style.display = 'none';
             }
         }
-        
+
         function updateConnectionStatus(status, text) {
             const statusEl = document.getElementById('connectionStatus');
             const statusTextEl = document.getElementById('connectionStatusText');
@@ -502,15 +938,19 @@ async function connectBLE() {
             document.getElementById('connectBtn').style.display = isConnected ? 'none' : 'flex';
 
             const controlButtons = ['onBtn', 'offBtn', 'budgetBtn', 'deleteBudgetBtn', 'timerBtn', 'deleteTimerBtn', 'setKwhRateBtn', 'resetUsageBtn', 'resetTimeBtn', 'resetAllBtn', 'scheduleBtn', 'deleteScheduleBtn'];
-            controlButtons.forEach(id => { const btn = document.getElementById(id); if(btn) btn.disabled = !isConnected; });
+            controlButtons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = !isConnected;
+            });
         }
-        
+
         // --- UI HELPER FUNCTIONS ---
         function setButtonLoading(id, loading, text) {
             const btn = document.getElementById(id);
             btn.disabled = loading;
             btn.innerHTML = loading ? `<div class="spinner"></div> <span>${text}</span>` : text;
         }
+
         function addLiveNotification(message, type = 'info') {
             const panel = document.getElementById('notificationsList');
             const item = document.createElement('div');
@@ -519,25 +959,34 @@ async function connectBLE() {
             panel.insertBefore(item, panel.firstChild);
             if (panel.children.length > 20) panel.removeChild(panel.lastChild);
         }
+
         function setKwhRate() {
             const rateString = document.getElementById('kwhRateInput').value;
             if (/^[0-9]*\.?[0-9]+$/.test(rateString) && parseFloat(rateString) > 0) {
                 sendCommand('RATE', rateString);
                 localStorage.setItem('kwhRate', rateString);
                 addLiveNotification(`kWh rate set to ₱${rateString}`, 'success');
-            } else { addLiveNotification('Invalid rate. Must be a positive number.', 'error'); }
+            } else {
+                addLiveNotification('Invalid rate. Must be a positive number.', 'error');
+            }
         }
-        function setBudget() { 
+
+        function setBudget() {
             const budgetInput = document.getElementById('budgetInput');
-            const b = parseFloat(budgetInput.value); 
-            if (!isNaN(b) && b > 0) { 
-                sendCommand('SET_BUDGET', b);  
-                budgetInput.value = ''; 
-            } else { 
-                addLiveNotification('Please enter a budget greater than 0.', 'error'); 
-            } 
+            const b = parseFloat(budgetInput.value);
+            if (!isNaN(b) && b > 0) {
+                sendCommand('SET_BUDGET', b);
+                budgetInput.value = '';
+            } else {
+                addLiveNotification('Please enter a budget greater than 0.', 'error');
+            }
         }
-        function deleteBudget() { sendCommand('SET_BUDGET', 0); addLiveNotification('Active budget deleted.', 'info'); }
+
+        function deleteBudget() {
+            sendCommand('SET_BUDGET', 0);
+            addLiveNotification('Active budget deleted.', 'info');
+        }
+
         function setTimer() {
             const h = parseInt(document.getElementById('timerHoursInput').value || '0', 10);
             const m = parseInt(document.getElementById('timerMinutesInput').value || '0', 10);
@@ -551,7 +1000,12 @@ async function connectBLE() {
                 addLiveNotification('Please enter a duration greater than 0.', 'error');
             }
         }
-        function deleteTimer() { sendCommand('SET_TIMER', 0); addLiveNotification('Active timer deleted.', 'info'); }
+
+        function deleteTimer() {
+            sendCommand('SET_TIMER', 0);
+            addLiveNotification('Active timer deleted.', 'info');
+        }
+
         function setSchedule() {
             const onTime = document.getElementById('scheduleOnTime').value;
             const offTime = document.getElementById('scheduleOffTime').value;
@@ -561,8 +1015,15 @@ async function connectBLE() {
             sendCommand('SCHED', `${onH},${onM},${offH},${offM}`);
             addLiveNotification('Schedule sent to device.', 'success');
         }
-        function deleteSchedule() { sendCommand('DEL_SCHED'); addLiveNotification('Schedule deleted.', 'info'); }
-        function confirmResetAll() { if(confirm("Are you sure? This will clear all usage data and settings on the device.")) sendCommand('RESET_ALL'); }
+
+        function deleteSchedule() {
+            sendCommand('DEL_SCHED');
+            addLiveNotification('Schedule deleted.', 'info');
+        }
+
+        function confirmResetAll() {
+            if (confirm("Are you sure? This will clear all usage data and settings on the device.")) sendCommand('RESET_ALL');
+        }
 
         // --- THEME & FULLSCREEN ---
         function initializeTheme() {
@@ -574,26 +1035,70 @@ async function connectBLE() {
                 document.getElementById('themeToggle').textContent = '🌙';
             }
         }
+
         function toggleDarkMode() {
             isDarkMode = !isDarkMode;
             localStorage.setItem('darkMode', isDarkMode);
             initializeTheme();
         }
-        function toggleFullscreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
-        
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        }
+
         // --- CHART LOGIC ---
         function initializeChart() {
             const ctx = document.getElementById('usageChart').getContext('2d');
             chart = new Chart(ctx, {
-                type: 'line', data: { labels: [], datasets: [] },
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
                 options: {
-                    responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'hour' } }, y: { beginAtZero: true, title: { display: true } } },
-                    plugins: { legend: { display: false }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'hour'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x'
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x'
+                            }
+                        }
+                    }
                 }
             });
             toggleChartType(currentChartType);
             setChartTimeRange('All');
         }
+
         function addDataPoint(power, cost, kwh) {
             const now = new Date();
             const nowISO = now.toISOString();
@@ -607,35 +1112,56 @@ async function connectBLE() {
                 Object.keys(chartData).forEach(key => chartData[key].shift());
             }
 
-            if (chart?.data.datasets.length > 0) {
+            if (chart ? .data.datasets.length > 0) {
                 chart.data.labels.push(now);
-                chart.data.datasets[0].data.push({ x: now.getTime(), y: arguments[currentChartType === 'power' ? 0 : currentChartType === 'cost' ? 1 : 2] });
-                
-                while(chart.data.labels.length > 2880) {
+                chart.data.datasets[0].data.push({
+                    x: now.getTime(),
+                    y: arguments[currentChartType === 'power' ? 0 : currentChartType === 'cost' ? 1 : 2]
+                });
+
+                while (chart.data.labels.length > 2880) {
                     chart.data.labels.shift();
                     chart.data.datasets[0].data.shift();
                 }
-                if(!chart.isZoomedOrPanned()) {
+                if (!chart.isZoomedOrPanned()) {
                     chart.update('none');
                 }
             }
         }
+
         function toggleChartType(type) {
             currentChartType = type;
             document.querySelectorAll('.chart-controls .chart-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(`chartType${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
             updateChart();
         }
+
         function setChartTimeRange(period) {
             if (!chart) return;
             const now = luxon.DateTime.now();
             let min;
-            switch(period) {
-                case '1H': min = now.minus({ hours: 1 }); break;
-                case '24H': min = now.minus({ days: 1 }); break;
-                case '7D': min = now.minus({ weeks: 1 }); break;
+            switch (period) {
+                case '1H':
+                    min = now.minus({
+                        hours: 1
+                    });
+                    break;
+                case '24H':
+                    min = now.minus({
+                        days: 1
+                    });
+                    break;
+                case '7D':
+                    min = now.minus({
+                        weeks: 1
+                    });
+                    break;
                 case 'All':
-                default: min = chartData.labels.length > 0 ? luxon.DateTime.fromISO(chartData.labels[0]) : now.minus({days: 1}); break;
+                default:
+                    min = chartData.labels.length > 0 ? luxon.DateTime.fromISO(chartData.labels[0]) : now.minus({
+                        days: 1
+                    });
+                    break;
             }
             chart.options.scales.x.min = min.toMillis();
             chart.options.scales.x.max = now.toMillis();
@@ -643,11 +1169,20 @@ async function connectBLE() {
             document.querySelectorAll('.chart-controls #timeRange1H, #timeRange24H, #timeRange7D, #timeRangeAll').forEach(b => b.classList.remove('active'));
             document.getElementById(`timeRange${period}`).classList.add('active');
         }
+
         function updateChart() {
             if (!chart) return;
-            const labelMap = { power: 'Power (W)', kwh: 'Energy (kWh)', cost: 'Cost (PHP)' };
-            const colorMap = { power: '#667eea', kwh: '#38a169', cost: '#ed8936' };
-            
+            const labelMap = {
+                power: 'Power (W)',
+                kwh: 'Energy (kWh)',
+                cost: 'Cost (PHP)'
+            };
+            const colorMap = {
+                power: '#667eea',
+                kwh: '#38a169',
+                cost: '#ed8936'
+            };
+
             const data = chartData.labels.map((label, index) => ({
                 x: luxon.DateTime.fromISO(label).toMillis(),
                 y: chartData[currentChartType][index]
@@ -666,11 +1201,14 @@ async function connectBLE() {
             chart.options.scales.y.title.text = labelMap[currentChartType];
             chart.update();
         }
-        function resetChartZoom() { if(chart) { chart.resetZoom(); setChartTimeRange('All'); } }
 
+        function resetChartZoom() {
+            if (chart) {
+                chart.resetZoom();
+                setChartTimeRange('All');
+            }
+        }
     </script>
 </body>
+
 </html>
-
-
-

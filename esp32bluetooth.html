@@ -321,7 +321,7 @@
 
         function connectMQTT() {
             const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
-            mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
+            mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, clientId);
             
             mqttClient.onConnectionLost = onMQTTConnectionLost;
             mqttClient.onMessageArrived = onMQTTMessage;
@@ -666,4 +666,5 @@
     </script>
 </body>
 </html>
+
 

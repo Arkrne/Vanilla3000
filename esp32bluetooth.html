@@ -291,33 +291,38 @@
             }
         }
 
-        async function connectBLE() {
-            if (!navigator.bluetooth) throw new Error('Web Bluetooth is not supported on this browser.');
-            
-            updateConnectionStatus('connecting', 'Bluetooth...');
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ name: 'ESP32_Power_Monitor' }],
-                optionalServices: [BLE_SERVICE_UUID]
-            });
-            
-            device.addEventListener('gattserverdisconnected', onBLEDisconnected);
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-            const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
-            bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
-            
-            await txChar.startNotifications();
-            txChar.addEventListener('characteristicvaluechanged', onBLEData);
-            
-            bleDevice = device;
-            connectionMode = 'ble';
-            updateConnectionStatus('connected', 'BLE Mode');
-            addLiveNotification('✅ Connected via Bluetooth.', 'success');
-            
-            document.getElementById('wifiSetupSection').style.display = 'block';
+async function connectBLE() {
+    if (!navigator.bluetooth) throw new Error('Web Bluetooth is not supported on this browser.');
+    
+    updateConnectionStatus('connecting', 'Bluetooth...');
+    
+    // --- FIX: Change the filter to look for the Service UUID ---
+    const device = await navigator.bluetooth.requestDevice({
+        filters: [{ 
+            services: [BLE_SERVICE_UUID] 
+        }],
+        optionalServices: [BLE_SERVICE_UUID] // Keep this to access the service after connection
+    });
+    // --- END OF FIX ---
+    
+    device.addEventListener('gattserverdisconnected', onBLEDisconnected);
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+    const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
+    bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
+    
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', onBLEData);
+    
+    bleDevice = device;
+    connectionMode = 'ble';
+    updateConnectionStatus('connected', 'BLE Mode');
+    addLiveNotification('✅ Connected via Bluetooth.', 'success');
+    
+    document.getElementById('wifiSetupSection').style.display = 'block';
 
-            connectMQTT();
-        }
+    connectMQTT();
+}
 
         function connectMQTT() {
             const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
@@ -666,5 +671,6 @@
     </script>
 </body>
 </html>
+
 
 

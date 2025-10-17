@@ -755,7 +755,8 @@
 
         function connectMQTT() {
             const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
-            mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, clientId);
+            // FIX: The MQTT client must be instantiated from Paho.MQTT.Client, not Paho.Client.
+            mqttClient = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientId);
 
             mqttClient.onConnectionLost = onMQTTConnectionLost;
             mqttClient.onMessageArrived = onMQTTMessage;
@@ -888,7 +889,7 @@
             if (data.I !== undefined) document.getElementById('current').textContent = parseFloat(data.I).toFixed(2);
             if (data.P !== undefined) document.getElementById('power').textContent = parseFloat(data.P).toFixed(1);
             if (data.KWH !== undefined) document.getElementById('energy').textContent = parseFloat(data.KWH).toFixed(3);
-            if (data.COST !== undefined) document.getElementById('cost').textContent = parseFloat(data.COST).toFixed(2);
+            if (data.COST !== undefined) document.getElementById('cost').textContent = `₱${parseFloat(data.COST).toFixed(2)}`;
             if (data.Relay !== undefined) document.getElementById('usageStatus').textContent = `Device is currently ${data.Relay}`;
             if (data.RUNTIME !== undefined) {
                 const s = parseInt(data.RUNTIME, 10);
@@ -1099,30 +1100,40 @@
             setChartTimeRange('All');
         }
 
+        // FIX: Reworked this function for clarity and efficiency.
         function addDataPoint(power, cost, kwh) {
             const now = new Date();
             const nowISO = now.toISOString();
 
+            // 1. Update the central data store for history
             chartData.labels.push(nowISO);
             chartData.power.push(power);
             chartData.cost.push(cost);
             chartData.kwh.push(kwh);
 
-            while (chartData.labels.length > 2880) { // Keep last 2 days of 1-min data
+            // 2. Trim the central data store to a max length
+            while (chartData.labels.length > 2880) { // Keeps the last ~2 days of 1-minute data
                 Object.keys(chartData).forEach(key => chartData[key].shift());
             }
-
-            if (chart ? .data.datasets.length > 0) {
+            
+            // 3. Update the live chart efficiently without a full redraw
+            if (chart?.data.datasets.length > 0) {
+                const newValues = { power, cost, kwh };
+                
+                // Add the new data point to the currently displayed chart arrays
                 chart.data.labels.push(now);
                 chart.data.datasets[0].data.push({
                     x: now.getTime(),
-                    y: arguments[currentChartType === 'power' ? 0 : currentChartType === 'cost' ? 1 : 2]
+                    y: newValues[currentChartType] // Use a clean object lookup for the correct value
                 });
 
+                // Trim the live chart arrays so they don't grow forever
                 while (chart.data.labels.length > 2880) {
                     chart.data.labels.shift();
                     chart.data.datasets[0].data.shift();
                 }
+
+                // Perform a lightweight update if the user isn't zoomed/panned
                 if (!chart.isZoomedOrPanned()) {
                     chart.update('none');
                 }

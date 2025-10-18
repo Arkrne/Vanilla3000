@@ -245,10 +245,11 @@
         // --- CONFIGURATION (ADAFRUIT IO) ---
         const MQTT_BROKER    = "io.adafruit.com";
         const MQTT_PORT      = 443;
-        const MQTT_USERNAME  = "Arkme";
-        const MQTT_PASSWORD  = "aio_AKtH60LkwmdfuCHMBMtxTzJqBgkS";
-        const STATUS_TOPIC   = "Arkme/feeds/device-status";
-        const COMMAND_TOPIC  = "Arkme/feeds/command-feed";
+        const MQTT_USERNAME  = "Arkrne";
+        const MQTT_PASSWORD  = "aio_zedO96Ws8qRSB65nNwsNYZrbXP0C"; 
+
+        const STATUS_TOPIC   = "Arkrne/feeds/device-status";
+        const COMMAND_TOPIC  = "Arkrne/feeds/command-feed";
 
         const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
@@ -341,7 +342,6 @@
             if (bleDevice && bleDevice.gatt.connected) {
                 await bleDevice.gatt.disconnect();
             }
-            // We don't disconnect MQTT as it's our primary connection
         }
 
         function onBLEDisconnected() {
@@ -356,7 +356,6 @@
             if (responseObject.errorCode !== 0) {
                 addLiveNotification(`MQTT connection lost: ${responseObject.errorMessage}`, 'warning');
                 updateConnectionStatusUI();
-                // Attempt to reconnect after a delay
                 setTimeout(connectMQTT, 5000);
             }
         }

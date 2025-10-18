@@ -246,7 +246,7 @@
         const MQTT_BROKER    = "io.adafruit.com";
         const MQTT_PORT      = 443;
         const MQTT_USERNAME  = "Arkrne";
-        const MQTT_PASSWORD  = "aio_zlaP27mmjETiAFDhC27jdURigMj3"; 
+        const MQTT_PASSWORD  = "aio_LslM228x8YtqhunyxDIJ7qXcV7oZ"; 
 
         const STATUS_TOPIC   = "Arkrne/feeds/device-status";
         const COMMAND_TOPIC  = "Arkrne/feeds/command-feed";
@@ -314,8 +314,8 @@
 
         function connectMQTT() {
             updateConnectionStatusUI('connecting');
-            const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
-            mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, clientId);
+            const clientId = "user_web_" + Math.random().toString(36).substring(2, 9);
+            mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", clientId);
             
             mqttClient.onConnectionLost = onMQTTConnectionLost;
             mqttClient.onMessageArrived = onMQTTMessage;
@@ -395,7 +395,7 @@
             const command = (value !== null) ? `${action}:${value}` : `${action}`;
             
             if (mqttClient && mqttClient.isConnected()) {
-                const message = new Paho.MQTT.Message(command);
+                const message = new Paho.Message(command);
                 message.destinationName = COMMAND_TOPIC;
                 mqttClient.send(message);
             } else if (bleDevice && bleDevice.gatt.connected) {

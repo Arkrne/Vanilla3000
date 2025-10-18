@@ -128,7 +128,7 @@
 
                 <div class="section" id="wifiSetupSection" style="display: none;">
                     <div class="section-title">🌐 Wi-Fi Provisioning</div>
-                     <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
+                      <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
                     <div class="input-group">
                         <input type="text" id="wifiSsidInput" class="input-field" placeholder="Wi-Fi Name (SSID)">
                     </div>
@@ -165,8 +165,8 @@
                         <input type="time" id="scheduleOffTime" class="input-field">
                     </div>
                     <div class="control-group">
-                         <button class="btn btn-primary" onclick="setSchedule()" id="scheduleBtn">Set Schedule</button>
-                         <button class="btn btn-danger" onclick="deleteSchedule()" id="deleteScheduleBtn">Delete Schedule</button>
+                          <button class="btn btn-primary" onclick="setSchedule()" id="scheduleBtn">Set Schedule</button>
+                          <button class="btn btn-danger" onclick="deleteSchedule()" id="deleteScheduleBtn">Delete Schedule</button>
                     </div>
                     <div id="activeScheduleDisplay" class="budget-time-display" style="display:none;">
                         <span class="label">Active Schedule</span>
@@ -242,14 +242,14 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const MQTT_BROKER    = "a656476c0c1f45d88ec84cf10f7dd1b4.s1.eu.hivemq.cloud";
-        const MQTT_PORT      = 8883;
-        const MQTT_USERNAME = "Arkrne.";
-        const MQTT_PASSWORD = "Arkrne123!@#";
-        const STATUS_TOPIC   = "smartplug/status";
-        const COMMAND_TOPIC  = "smartplug/command";
-        const LWT_TOPIC      = "smartplug/connection";
+        // --- CONFIGURATION (ADAFRUIT IO) ---
+        const MQTT_BROKER    = "io.adafruit.com";
+        const MQTT_PORT      = 443;
+        const MQTT_USERNAME  = "Arkme";
+        const MQTT_PASSWORD  = "aio_AKtH60LkwmdfuCHMBMtxTzJqBgkS";
+        const STATUS_TOPIC   = "Arkme/feeds/device-status";
+        const COMMAND_TOPIC  = "Arkme/feeds/command-feed";
+
         const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
@@ -273,9 +273,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeTheme();
             initializeChart();
-            updateConnectionStatus('disconnected'); // Set initial button states
+            updateConnectionStatus('disconnected');
             const savedRate = localStorage.getItem('kwhRate');
             if (savedRate) document.getElementById('kwhRateInput').value = savedRate;
+            
+            // Auto-connect to MQTT on page load
+            connectMQTT();
         });
 
         // --- CONNECTION LOGIC ---
@@ -315,8 +318,6 @@
             addLiveNotification('✅ Connected via Bluetooth.', 'success');
             
             document.getElementById('wifiSetupSection').style.display = 'block';
-
-            connectMQTT();
         }
 
         function connectMQTT() {
@@ -332,18 +333,17 @@
                 useSSL: true,
                 onSuccess: onMQTTConnect,
                 onFailure: (err) => {
-                    addLiveNotification(`MQTT connection failed. Using BLE mode.`, 'warning');
+                    addLiveNotification(`MQTT connection failed. Live data unavailable. Error: ${err.errorMessage}`, 'error');
                 }
             });
         }
 
         function onMQTTConnect() {
             mqttClient.subscribe(STATUS_TOPIC);
-            mqttClient.subscribe(LWT_TOPIC);
             
             connectionMode = 'mqtt';
             updateConnectionStatus('connected', 'MQTT Online');
-            addLiveNotification('🚀 Connected to MQTT for remote access.', 'success');
+            addLiveNotification('🚀 Connected to Adafruit IO for remote access.', 'success');
             document.getElementById('wifiSetupSection').style.display = 'none';
         }
         
@@ -410,7 +410,7 @@
         async function sendCommand(action, value = null) {
             const command = (value !== null) ? `${action}:${value}` : `${action}`;
             
-            if (connectionMode === 'mqtt' && mqttClient && mqttClient.isConnected()) {
+            if (mqttClient && mqttClient.isConnected()) {
                 const message = new Paho.MQTT.Message(command);
                 message.destinationName = COMMAND_TOPIC;
                 mqttClient.send(message);
@@ -421,9 +421,8 @@
             }
         }
         
-        // --- NEW --- Helper function to send data in chunks over BLE
         async function sendCommandInChunks(data) {
-            const CHUNK_SIZE = 20; // Standard BLE MTU size is ~23 bytes, 20 is safe.
+            const CHUNK_SIZE = 20; 
             const encoder = new TextEncoder();
             const encodedData = encoder.encode(data);
             
@@ -433,7 +432,6 @@
             }
         }
         
-        // --- NEW --- More robust function for sending credentials
         const sleep = ms => new Promise(res => setTimeout(res, ms));
 
         async function sendWifiCredentials() {
@@ -448,11 +446,11 @@
                 try {
                     addLiveNotification('Sending SSID...', 'info');
                     await sendCommandInChunks(`SET_SSID:${ssid}\n`);
-                    await sleep(300); // Wait a moment for the ESP32 to process
+                    await sleep(300);
 
                     addLiveNotification('Sending Password...', 'info');
                     await sendCommandInChunks(`SET_PASS:${pass}\n`);
-                    await sleep(300); // Wait a moment for the ESP32 to process
+                    await sleep(300);
 
                     addLiveNotification('Saving credentials to device...', 'success');
                     await sendCommandInChunks('SAVE_WIFI\n');
@@ -473,7 +471,7 @@
             if (data.I !== undefined) document.getElementById('current').textContent = parseFloat(data.I).toFixed(2);
             if (data.P !== undefined) document.getElementById('power').textContent = parseFloat(data.P).toFixed(1);
             if (data.KWH !== undefined) document.getElementById('energy').textContent = parseFloat(data.KWH).toFixed(3);
-            if (data.COST !== undefined) document.getElementById('cost').textContent = parseFloat(data.COST).toFixed(2);
+            if (data.COST !== undefined) document.getElementById('cost').textContent = `₱${parseFloat(data.COST).toFixed(2)}`;
             if (data.Relay !== undefined) document.getElementById('usageStatus').textContent = `Device is currently ${data.Relay}`;
             if (data.RUNTIME !== undefined) {
                 const s = parseInt(data.RUNTIME, 10);

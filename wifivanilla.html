@@ -165,8 +165,8 @@
                         <input type="time" id="scheduleOffTime" class="input-field">
                     </div>
                     <div class="control-group">
-                          <button class="btn btn-primary" onclick="setSchedule()" id="scheduleBtn">Set Schedule</button>
-                          <button class="btn btn-danger" onclick="deleteSchedule()" id="deleteScheduleBtn">Delete Schedule</button>
+                         <button class="btn btn-primary" onclick="setSchedule()" id="scheduleBtn">Set Schedule</button>
+                         <button class="btn btn-danger" onclick="deleteSchedule()" id="deleteScheduleBtn">Delete Schedule</button>
                     </div>
                     <div id="activeScheduleDisplay" class="budget-time-display" style="display:none;">
                         <span class="label">Active Schedule</span>
@@ -296,7 +296,7 @@
             
             updateConnectionStatus('connecting', 'Bluetooth...');
             const device = await navigator.bluetooth.requestDevice({
-                filters: [{ services: [BLE_SERVICE_UUID] }], // Filter by service UUID for reliability
+                filters: [{ services: [BLE_SERVICE_UUID] }],
                 optionalServices: [BLE_SERVICE_UUID]
             });
             
@@ -409,56 +409,63 @@
 
         async function sendCommand(action, value = null) {
             const command = (value !== null) ? `${action}:${value}` : `${action}`;
-            let sent = false;
-
+            
             if (connectionMode === 'mqtt' && mqttClient && mqttClient.isConnected()) {
                 const message = new Paho.MQTT.Message(command);
                 message.destinationName = COMMAND_TOPIC;
                 mqttClient.send(message);
-                sent = true;
             } else if (bleDevice && bleDevice.gatt.connected && bleRxCharacteristic) {
-                try {
-                    // --- FIX: Chunk data for long commands to handle BLE MTU limits ---
-                    const commandWithNewline = command + '\n';
-                    const encoded = new TextEncoder().encode(commandWithNewline);
-                    const chunkSize = 20; // Standard BLE packet size for write without response
-
-                    if (encoded.length > chunkSize) {
-                        addLiveNotification(`Sending long command (${encoded.length} bytes) in chunks...`, 'info');
-                        for (let i = 0; i < encoded.length; i += chunkSize) {
-                            const chunk = encoded.slice(i, i + chunkSize);
-                            await bleRxCharacteristic.writeValueWithoutResponse(chunk);
-                            // A small delay between packets can help prevent buffer issues on the ESP32
-                            await new Promise(resolve => setTimeout(resolve, 20)); 
-                        }
-                    } else {
-                        await bleRxCharacteristic.writeValueWithoutResponse(encoded);
-                    }
-                    sent = true;
-                } catch (error) {
-                    addLiveNotification(`BLE command failed: ${error.message}`, 'error');
-                }
-            }
-            
-            if (!sent) {
+                 await sendCommandInChunks(command + '\n');
+            } else {
                  addLiveNotification('Cannot send command. No active connection.', 'error');
             }
         }
         
-        function sendWifiCredentials() {
+        // --- NEW --- Helper function to send data in chunks over BLE
+        async function sendCommandInChunks(data) {
+            const CHUNK_SIZE = 20; // Standard BLE MTU size is ~23 bytes, 20 is safe.
+            const encoder = new TextEncoder();
+            const encodedData = encoder.encode(data);
+            
+            for (let i = 0; i < encodedData.length; i += CHUNK_SIZE) {
+                const chunk = encodedData.slice(i, i + CHUNK_SIZE);
+                await bleRxCharacteristic.writeValueWithoutResponse(chunk);
+            }
+        }
+        
+        // --- NEW --- More robust function for sending credentials
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        async function sendWifiCredentials() {
             const ssid = document.getElementById('wifiSsidInput').value;
             const pass = document.getElementById('wifiPassInput').value;
-            if (!ssid) return addLiveNotification('Please enter a Wi-Fi Name (SSID).', 'error');
-            
-            const commandValue = `${ssid},${pass}`;
-            // Provisioning is always sent over BLE
+            if (!ssid) {
+                addLiveNotification('Please enter a Wi-Fi Name (SSID).', 'error');
+                return;
+            }
+
             if (bleDevice && bleDevice.gatt.connected) {
-                sendCommand('PROVISION', commandValue);
-                addLiveNotification('Wi-Fi credentials sent. The device will now reboot.', 'info');
+                try {
+                    addLiveNotification('Sending SSID...', 'info');
+                    await sendCommandInChunks(`SET_SSID:${ssid}\n`);
+                    await sleep(300); // Wait a moment for the ESP32 to process
+
+                    addLiveNotification('Sending Password...', 'info');
+                    await sendCommandInChunks(`SET_PASS:${pass}\n`);
+                    await sleep(300); // Wait a moment for the ESP32 to process
+
+                    addLiveNotification('Saving credentials to device...', 'success');
+                    await sendCommandInChunks('SAVE_WIFI\n');
+
+                    addLiveNotification('Wi-Fi credentials sent. The device will now reboot.', 'success');
+                } catch (error) {
+                    addLiveNotification(`Failed to send credentials: ${error.message}`, 'error');
+                }
             } else {
                 addLiveNotification('Must be connected via Bluetooth to send Wi-Fi credentials.', 'error');
             }
         }
+
 
         // --- UI UPDATE FUNCTIONS ---
         function updateMetricsUI(data) {

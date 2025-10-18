@@ -296,7 +296,7 @@
             
             updateConnectionStatus('connecting', 'Bluetooth...');
             const device = await navigator.bluetooth.requestDevice({
-                filters: [{ name: 'ESP32_Power_Monitor' }],
+                filters: [{ services: [BLE_SERVICE_UUID] }], // Filter by service UUID for reliability
                 optionalServices: [BLE_SERVICE_UUID]
             });
             
@@ -418,7 +418,22 @@
                 sent = true;
             } else if (bleDevice && bleDevice.gatt.connected && bleRxCharacteristic) {
                 try {
-                    await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(command + '\n'));
+                    // --- FIX: Chunk data for long commands to handle BLE MTU limits ---
+                    const commandWithNewline = command + '\n';
+                    const encoded = new TextEncoder().encode(commandWithNewline);
+                    const chunkSize = 20; // Standard BLE packet size for write without response
+
+                    if (encoded.length > chunkSize) {
+                        addLiveNotification(`Sending long command (${encoded.length} bytes) in chunks...`, 'info');
+                        for (let i = 0; i < encoded.length; i += chunkSize) {
+                            const chunk = encoded.slice(i, i + chunkSize);
+                            await bleRxCharacteristic.writeValueWithoutResponse(chunk);
+                            // A small delay between packets can help prevent buffer issues on the ESP32
+                            await new Promise(resolve => setTimeout(resolve, 20)); 
+                        }
+                    } else {
+                        await bleRxCharacteristic.writeValueWithoutResponse(encoded);
+                    }
                     sent = true;
                 } catch (error) {
                     addLiveNotification(`BLE command failed: ${error.message}`, 'error');
@@ -666,3 +681,4 @@
     </script>
 </body>
 </html>
+

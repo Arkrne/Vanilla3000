@@ -121,14 +121,14 @@
                         <span id="connectionStatusText">Offline</span>
                     </div>
                     <div class="control-group">
-                        <button class="btn btn-primary" onclick="connectDevice()" id="connectBtn">Connect to Device</button>
-                        <button class="btn btn-danger" onclick="disconnectDevice()" id="disconnectBtn" style="display: none;">Disconnect</button>
+                        <button class="btn btn-primary" onclick="connectDevice()" id="connectBtn">Provision via BLE</button>
+                        <button class="btn btn-danger" onclick="disconnectDevice()" id="disconnectBtn" style="display: none;">Disconnect BLE</button>
                     </div>
                 </div>
 
                 <div class="section" id="wifiSetupSection" style="display: none;">
                     <div class="section-title">🌐 Wi-Fi Provisioning</div>
-                     <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
+                      <p class="text-sm text-gray-500 mb-4 -mt-2">Send Wi-Fi details to your device for remote access.</p>
                     <div class="input-group">
                         <input type="text" id="wifiSsidInput" class="input-field" placeholder="Wi-Fi Name (SSID)">
                     </div>
@@ -242,14 +242,15 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const MQTT_BROKER    = "a656476c0c1f45d88ec84cf10f7dd1b4.s1.eu.hivemq.cloud";
-        const MQTT_PORT      = 8883;
-        const MQTT_USERNAME = "Arkrne.";
-        const MQTT_PASSWORD = "Arkrne123!@#";
-        const STATUS_TOPIC   = "smartplug/status";
-        const COMMAND_TOPIC  = "smartplug/command";
-        const LWT_TOPIC      = "smartplug/connection";
+        // --- CONFIGURATION (ADAFRUIT IO) ---
+        const MQTT_BROKER    = "io.adafruit.com";
+        const MQTT_PORT      = 443;
+        const MQTT_USERNAME  = "Arkrne";
+        const MQTT_PASSWORD  = "aio_tUAo67qhJR9RWOseLZFL1gwrR089"; 
+
+        const STATUS_TOPIC   = "Arkrne/feeds/device-status";
+        const COMMAND_TOPIC  = "Arkrne/feeds/command-feed";
+
         const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
@@ -258,7 +259,6 @@
         let mqttClient = null;
         let bleDevice = null;
         let bleRxCharacteristic = null;
-        let connectionMode = 'none'; // 'none', 'ble', 'mqtt'
         let isDarkMode = localStorage.getItem('darkMode') === 'true';
         let chart = null;
         let currentChartType = 'power';
@@ -273,55 +273,49 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeTheme();
             initializeChart();
-            updateConnectionStatus('disconnected'); // Set initial button states
+            updateConnectionStatusUI();
             const savedRate = localStorage.getItem('kwhRate');
             if (savedRate) document.getElementById('kwhRateInput').value = savedRate;
+            connectMQTT();
         });
 
         // --- CONNECTION LOGIC ---
         async function connectDevice() {
+            if (bleDevice && bleDevice.gatt.connected) {
+                addLiveNotification('Already connected to a BLE device.', 'info');
+                return;
+            }
             setButtonLoading('connectBtn', true, 'Connecting...');
             try {
-                await connectBLE();
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [BLE_SERVICE_UUID] }],
+                    optionalServices: [BLE_SERVICE_UUID]
+                });
+                
+                device.addEventListener('gattserverdisconnected', onBLEDisconnected);
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+                const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
+                bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
+                
+                await txChar.startNotifications();
+                txChar.addEventListener('characteristicvaluechanged', onBLEData);
+                
+                bleDevice = device;
+                addLiveNotification('✅ Connected via Bluetooth for provisioning.', 'success');
+                document.getElementById('wifiSetupSection').style.display = 'block';
             } catch (error) {
-                addLiveNotification(`Connection failed: ${error.message}`, 'error');
-                updateConnectionStatus('disconnected');
+                addLiveNotification(`BLE Connection failed: ${error.message}`, 'error');
             } finally {
-                setButtonLoading('connectBtn', false, 'Connect to Device');
+                setButtonLoading('connectBtn', false, 'Provision via BLE');
+                updateConnectionStatusUI();
             }
         }
 
-        async function connectBLE() {
-            if (!navigator.bluetooth) throw new Error('Web Bluetooth is not supported on this browser.');
-            
-            updateConnectionStatus('connecting', 'Bluetooth...');
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ name: 'ESP32_Power_Monitor' }],
-                optionalServices: [BLE_SERVICE_UUID]
-            });
-            
-            device.addEventListener('gattserverdisconnected', onBLEDisconnected);
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService(BLE_SERVICE_UUID);
-            const txChar = await service.getCharacteristic(BLE_TX_CHAR_UUID);
-            bleRxCharacteristic = await service.getCharacteristic(BLE_RX_CHAR_UUID);
-            
-            await txChar.startNotifications();
-            txChar.addEventListener('characteristicvaluechanged', onBLEData);
-            
-            bleDevice = device;
-            connectionMode = 'ble';
-            updateConnectionStatus('connected', 'BLE Mode');
-            addLiveNotification('✅ Connected via Bluetooth.', 'success');
-            
-            document.getElementById('wifiSetupSection').style.display = 'block';
-
-            connectMQTT();
-        }
-
         function connectMQTT() {
-            const clientId = "web-client-" + Math.random().toString(16).substr(2, 8);
-            mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, clientId);
+            updateConnectionStatusUI('connecting');
+            const clientId = "user_web_" + Math.random().toString(36).substring(2, 9);
+            mqttClient = new Paho.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", clientId);
             
             mqttClient.onConnectionLost = onMQTTConnectionLost;
             mqttClient.onMessageArrived = onMQTTMessage;
@@ -332,47 +326,37 @@
                 useSSL: true,
                 onSuccess: onMQTTConnect,
                 onFailure: (err) => {
-                    addLiveNotification(`MQTT connection failed. Using BLE mode.`, 'warning');
+                    addLiveNotification(`MQTT connection failed: ${err.errorMessage}`, 'error');
+                    updateConnectionStatusUI();
                 }
             });
         }
 
         function onMQTTConnect() {
             mqttClient.subscribe(STATUS_TOPIC);
-            mqttClient.subscribe(LWT_TOPIC);
-            
-            connectionMode = 'mqtt';
-            updateConnectionStatus('connected', 'MQTT Online');
-            addLiveNotification('🚀 Connected to MQTT for remote access.', 'success');
-            document.getElementById('wifiSetupSection').style.display = 'none';
+            addLiveNotification('🚀 Connected to Adafruit IO for remote access.', 'success');
+            updateConnectionStatusUI();
         }
         
         async function disconnectDevice() {
-            if (mqttClient && mqttClient.isConnected()) mqttClient.disconnect();
-            if (bleDevice && bleDevice.gatt.connected) await bleDevice.gatt.disconnect();
-            updateConnectionStatus('disconnected');
+            if (bleDevice && bleDevice.gatt.connected) {
+                await bleDevice.gatt.disconnect();
+            }
         }
 
         function onBLEDisconnected() {
             bleDevice = null;
             bleRxCharacteristic = null;
-            if (connectionMode !== 'mqtt') {
-                updateConnectionStatus('disconnected');
-                addLiveNotification('Bluetooth connection lost.', 'warning');
-            }
+            addLiveNotification('Bluetooth device disconnected.', 'warning');
             document.getElementById('wifiSetupSection').style.display = 'none';
+            updateConnectionStatusUI();
         }
         
         function onMQTTConnectionLost(responseObject) {
             if (responseObject.errorCode !== 0) {
                 addLiveNotification(`MQTT connection lost: ${responseObject.errorMessage}`, 'warning');
-                if (bleDevice && bleDevice.gatt.connected) {
-                    connectionMode = 'ble';
-                    updateConnectionStatus('connected', 'BLE Mode');
-                } else {
-                    connectionMode = 'none';
-                    updateConnectionStatus('disconnected');
-                }
+                updateConnectionStatusUI();
+                setTimeout(connectMQTT, 5000);
             }
         }
 
@@ -409,41 +393,65 @@
 
         async function sendCommand(action, value = null) {
             const command = (value !== null) ? `${action}:${value}` : `${action}`;
-            let sent = false;
-
-            if (connectionMode === 'mqtt' && mqttClient && mqttClient.isConnected()) {
-                const message = new Paho.MQTT.Message(command);
+            
+            if (mqttClient && mqttClient.isConnected()) {
+                const message = new Paho.Message(command);
                 message.destinationName = COMMAND_TOPIC;
                 mqttClient.send(message);
-                sent = true;
-            } else if (bleDevice && bleDevice.gatt.connected && bleRxCharacteristic) {
-                try {
-                    await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(command + '\n'));
-                    sent = true;
-                } catch (error) {
-                    addLiveNotification(`BLE command failed: ${error.message}`, 'error');
-                }
-            }
-            
-            if (!sent) {
+            } else if (bleDevice && bleDevice.gatt.connected) {
+                 await sendCommandInChunks(command + '\n');
+            } else {
                  addLiveNotification('Cannot send command. No active connection.', 'error');
             }
         }
         
-        function sendWifiCredentials() {
+        async function sendCommandInChunks(data) {
+            if (!bleRxCharacteristic) {
+                addLiveNotification('BLE Characteristic not found.', 'error');
+                return;
+            }
+            const CHUNK_SIZE = 20; 
+            const encoder = new TextEncoder();
+            const encodedData = encoder.encode(data);
+            
+            for (let i = 0; i < encodedData.length; i += CHUNK_SIZE) {
+                const chunk = encodedData.slice(i, i + CHUNK_SIZE);
+                await bleRxCharacteristic.writeValueWithoutResponse(chunk);
+            }
+        }
+        
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        async function sendWifiCredentials() {
             const ssid = document.getElementById('wifiSsidInput').value;
             const pass = document.getElementById('wifiPassInput').value;
-            if (!ssid) return addLiveNotification('Please enter a Wi-Fi Name (SSID).', 'error');
-            
-            const commandValue = `${ssid},${pass}`;
-            // Provisioning is always sent over BLE
+            if (!ssid) {
+                addLiveNotification('Please enter a Wi-Fi Name (SSID).', 'error');
+                return;
+            }
+
             if (bleDevice && bleDevice.gatt.connected) {
-                sendCommand('PROVISION', commandValue);
-                addLiveNotification('Wi-Fi credentials sent. The device will now reboot.', 'info');
+                try {
+                    addLiveNotification('Sending SSID...', 'info');
+                    await sendCommandInChunks(`SET_SSID:${ssid}\n`);
+                    await sleep(300);
+
+                    addLiveNotification('Sending Password...', 'info');
+                    await sendCommandInChunks(`SET_PASS:${pass}\n`);
+                    await sleep(300);
+
+                    addLiveNotification('Saving credentials to device...', 'success');
+                    await sendCommandInChunks('SAVE_WIFI\n');
+
+                    addLiveNotification('Wi-Fi credentials sent. The device will now reboot.', 'success');
+                } catch (error) {
+                    addLiveNotification(`Failed to send credentials: ${error.message}`, 'error');
+                }
             } else {
                 addLiveNotification('Must be connected via Bluetooth to send Wi-Fi credentials.', 'error');
             }
         }
+
 
         // --- UI UPDATE FUNCTIONS ---
         function updateMetricsUI(data) {
@@ -451,7 +459,7 @@
             if (data.I !== undefined) document.getElementById('current').textContent = parseFloat(data.I).toFixed(2);
             if (data.P !== undefined) document.getElementById('power').textContent = parseFloat(data.P).toFixed(1);
             if (data.KWH !== undefined) document.getElementById('energy').textContent = parseFloat(data.KWH).toFixed(3);
-            if (data.COST !== undefined) document.getElementById('cost').textContent = parseFloat(data.COST).toFixed(2);
+            if (data.COST !== undefined) document.getElementById('cost').textContent = `₱${parseFloat(data.COST).toFixed(2)}`;
             if (data.Relay !== undefined) document.getElementById('usageStatus').textContent = `Device is currently ${data.Relay}`;
             if (data.RUNTIME !== undefined) {
                 const s = parseInt(data.RUNTIME, 10);
@@ -487,17 +495,35 @@
             }
         }
         
-        function updateConnectionStatus(status, text) {
+        function updateConnectionStatusUI(mqttState = null) {
             const statusEl = document.getElementById('connectionStatus');
             const statusTextEl = document.getElementById('connectionStatusText');
-            statusEl.className = `connection-status ${status}`;
-            statusTextEl.textContent = text || 'Offline';
-            const isConnected = status === 'connected';
-            document.getElementById('disconnectBtn').style.display = isConnected ? 'flex' : 'none';
-            document.getElementById('connectBtn').style.display = isConnected ? 'none' : 'flex';
+            const isMqttConnected = mqttClient && mqttClient.isConnected();
+            const isBleConnected = bleDevice && bleDevice.gatt.connected;
+            const canSendCommand = isMqttConnected || isBleConnected;
+
+            document.getElementById('connectBtn').style.display = isBleConnected ? 'none' : 'flex';
+            document.getElementById('disconnectBtn').style.display = isBleConnected ? 'flex' : 'none';
+
+            if (isMqttConnected) {
+                statusEl.className = 'connection-status connected';
+                statusTextEl.textContent = isBleConnected ? 'MQTT & BLE Connected' : 'MQTT Online';
+            } else if (isBleConnected) {
+                statusEl.className = 'connection-status connected';
+                statusTextEl.textContent = 'BLE Connected';
+            } else if (mqttState === 'connecting') {
+                 statusEl.className = 'connection-status connecting';
+                 statusTextEl.textContent = 'Connecting to MQTT...';
+            } else {
+                statusEl.className = 'connection-status disconnected';
+                statusTextEl.textContent = 'Offline';
+            }
 
             const controlButtons = ['onBtn', 'offBtn', 'budgetBtn', 'deleteBudgetBtn', 'timerBtn', 'deleteTimerBtn', 'setKwhRateBtn', 'resetUsageBtn', 'resetTimeBtn', 'resetAllBtn', 'scheduleBtn', 'deleteScheduleBtn'];
-            controlButtons.forEach(id => { const btn = document.getElementById(id); if(btn) btn.disabled = !isConnected; });
+            controlButtons.forEach(id => { 
+                const btn = document.getElementById(id); 
+                if(btn) btn.disabled = !canSendCommand; 
+            });
         }
         
         // --- UI HELPER FUNCTIONS ---
@@ -666,3 +692,4 @@
     </script>
 </body>
 </html>
+

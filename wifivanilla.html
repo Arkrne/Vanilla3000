@@ -246,10 +246,10 @@
         const MQTT_BROKER    = "io.adafruit.com";
         const MQTT_PORT      = 443;
         const MQTT_USERNAME  = "Arkrne";
-        const MQTT_PASSWORD  = "aio_KQPk4801rgLEfmuqLUnAy5ND9y79"; 
+        const MQTT_PASSWORD  = "aio_QJpx842WWCvGSEDfKplvs2vKX2NB"; 
 
-        const STATUS_TOPIC   = "Arkrne/feeds/device-status";
-        const COMMAND_TOPIC  = "Arkrne/feeds/command-feed";
+        const STATUS_TOPIC   = `${MQTT_USERNAME}/feeds/device-status`;
+        const COMMAND_TOPIC  = `${MQTT_USERNAME}/feeds/command-feed`;
 
         const BLE_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
         const BLE_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
